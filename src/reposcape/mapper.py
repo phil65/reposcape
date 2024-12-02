@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 import pkgutil
 from types import ModuleType
-from typing import TYPE_CHECKING, overload
+from typing import TYPE_CHECKING, Literal, overload
 import warnings
 
 from upath import UPath
@@ -13,7 +13,12 @@ from upath import UPath
 from reposcape.analyzers import PythonAstAnalyzer, TextAnalyzer
 from reposcape.importance import ImportanceCalculator, ReferenceScorer
 from reposcape.models import CodeNode, DetailLevel, NodeType
-from reposcape.serializers import MarkdownSerializer
+from reposcape.serializers import (
+    CodeSerializer,
+    CompactSerializer,
+    MarkdownSerializer,
+    TreeSerializer,
+)
 
 
 if TYPE_CHECKING:
@@ -22,7 +27,8 @@ if TYPE_CHECKING:
 
     from reposcape.analyzers import CodeAnalyzer
     from reposcape.importance import GraphScorer
-    from reposcape.serializers import CodeSerializer
+
+SerializerType = Literal["markdown", "compact", "tree"]
 
 
 class RepoMapper:
@@ -33,7 +39,7 @@ class RepoMapper:
         *,
         analyzers: Sequence[CodeAnalyzer] | None = None,
         scorer: GraphScorer | None = None,
-        serializer: CodeSerializer | None = None,
+        serializer: SerializerType | CodeSerializer = "markdown",
     ):
         """Initialize RepoMapper.
 
@@ -43,16 +49,19 @@ class RepoMapper:
             serializer: Serializer for output generation
         """
         self.analyzers = (
-            list(analyzers)
-            if analyzers
-            else [
-                PythonAstAnalyzer(),
-                TextAnalyzer(),
-            ]
+            list(analyzers) if analyzers else [PythonAstAnalyzer(), TextAnalyzer()]
         )
-        # Create ImportanceCalculator with provided or default scorer
         self.importance_calculator = ImportanceCalculator(scorer or ReferenceScorer())
-        self.serializer = serializer or MarkdownSerializer()
+
+        # Handle serializer string or instance
+        if isinstance(serializer, str):
+            self.serializer = {
+                "markdown": MarkdownSerializer(),
+                "compact": CompactSerializer(),
+                "tree": TreeSerializer(),
+            }[serializer]
+        else:
+            self.serializer = serializer
 
     @overload
     def create_overview(
@@ -62,6 +71,7 @@ class RepoMapper:
         token_limit: int | None = None,
         detail: DetailLevel = DetailLevel.SIGNATURES,
         exclude_patterns: list[str] | None = None,
+        root_package: None = None,
     ) -> str: ...
 
     @overload
@@ -71,16 +81,17 @@ class RepoMapper:
         *,
         token_limit: int | None = None,
         detail: DetailLevel = DetailLevel.SIGNATURES,
+        root_package: ModuleType | None = None,
     ) -> str: ...
 
     def create_overview(
         self,
         repo_path: str | PathLike[str] | ModuleType,
         *,
-        root_package: ModuleType | None = None,
         token_limit: int | None = None,
         detail: DetailLevel = DetailLevel.SIGNATURES,
         exclude_patterns: list[str] | None = None,
+        root_package: ModuleType | None = None,
     ) -> str:
         """Create a high-level overview.
 
@@ -175,6 +186,7 @@ class RepoMapper:
         else:
             return root_node
 
+    @overload
     def create_focused_view(
         self,
         files: Sequence[str | PathLike[str]],
@@ -183,6 +195,29 @@ class RepoMapper:
         token_limit: int | None = None,
         detail: DetailLevel = DetailLevel.SIGNATURES,
         exclude_patterns: list[str] | None = None,
+        root_package: None = None,
+    ) -> str: ...
+
+    @overload
+    def create_focused_view(
+        self,
+        files: Sequence[str],
+        repo_path: ModuleType,
+        *,
+        token_limit: int | None = None,
+        detail: DetailLevel = DetailLevel.SIGNATURES,
+        root_package: ModuleType | None = None,
+    ) -> str: ...
+
+    def create_focused_view(
+        self,
+        files: Sequence[str | PathLike[str]],
+        repo_path: str | PathLike[str] | ModuleType,
+        *,
+        token_limit: int | None = None,
+        detail: DetailLevel = DetailLevel.SIGNATURES,
+        exclude_patterns: list[str] | None = None,
+        root_package: ModuleType | None = None,
     ) -> str:
         """Create a view focused on specific files and their relationships.
 
@@ -192,18 +227,26 @@ class RepoMapper:
             token_limit: Maximum tokens in output
             detail: Level of detail to include
             exclude_patterns: Glob patterns for paths to exclude
+            root_package: Optional parent package to consider for references
+                When analyzing a module, references to other modules within
+                root_package will be included in the analysis.
 
         Returns:
             Structured view focused on specified files
         """
-        repo_path = UPath(repo_path)
-        focused_paths = {str(UPath(f).relative_to(repo_path)) for f in files}
-
-        # Analyze repository structure
-        root_node = self._analyze_repository(
-            repo_path,
-            exclude_patterns=exclude_patterns,
-        )
+        if isinstance(repo_path, ModuleType):
+            # If no root_package specified, use repo_path as root
+            pkg_name = (root_package or repo_path).__name__
+            root_node = self._analyze_module(repo_path, pkg_name)
+            # Convert file paths to module paths relative to package
+            focused_paths = {f"{pkg_name}.{str(f).replace('/', '.')}" for f in files}
+        else:
+            repo_path = UPath(repo_path)
+            focused_paths = {str(UPath(f).relative_to(repo_path)) for f in files}
+            root_node = self._analyze_repository(
+                repo_path,
+                exclude_patterns=exclude_patterns,
+            )
 
         # Calculate importance scores with focus
         self._calculate_importance(
