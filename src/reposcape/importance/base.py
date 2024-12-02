@@ -2,20 +2,25 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
+
+from reposcape.importance.graph import RustworkxGraph
 
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from reposcape.importance.scoring import GraphScorer
     from reposcape.models.nodes import CodeNode
 
 
-class ImportanceCalculator(ABC):
-    """Abstract base class for calculating importance of code elements."""
+class ImportanceCalculator:
+    """Calculate importance of code elements using graph-based scoring."""
 
-    @abstractmethod
+    def __init__(self, scorer: GraphScorer):
+        """Initialize calculator with a scoring algorithm."""
+        self.scorer = scorer
+
     def calculate(
         self,
         nodes: Sequence[CodeNode],
@@ -32,3 +37,67 @@ class ImportanceCalculator(ABC):
         Returns:
             Dictionary mapping node paths to importance scores (0.0 to 1.0)
         """
+        # Build graph
+        graph = self._build_graph(nodes)
+
+        # Get weights for mentioned symbols
+        weights = self._get_weights(nodes, focused_paths, mentioned_symbols)
+
+        # Calculate scores using the configured scorer
+        return self.scorer.score(
+            graph,
+            important_nodes=focused_paths,
+            weights=weights,
+        )
+
+    def _build_graph(self, nodes: Sequence[CodeNode]) -> RustworkxGraph:
+        """Build graph from code nodes."""
+        graph = RustworkxGraph()
+
+        # First pass: add all nodes and collect symbol definitions
+        symbol_defs: dict[str, str] = {}
+        for node in nodes:
+            graph.add_node(node.path)
+            symbol_defs[node.name] = node.path
+
+            if node.children:
+                for child in node.children.values():
+                    symbol_defs[child.name] = node.path
+
+        # Second pass: add edges
+        for node in nodes:
+            # Add parent-child relationships
+            if node.children:
+                for child in node.children.values():
+                    graph.add_edge(node.path, child.path, weight=1.0)
+
+            # Add reference relationships
+            if node.references_to:
+                for ref in node.references_to:
+                    if ref.name in symbol_defs:
+                        target = symbol_defs[ref.name]
+                        graph.add_edge(node.path, target, weight=0.5)
+
+        return graph
+
+    def _get_weights(
+        self,
+        nodes: Sequence[CodeNode],
+        focused_paths: set[str] | None,
+        mentioned_symbols: set[str] | None,
+    ) -> dict[str, float]:
+        """Calculate initial weights for nodes."""
+        weights: dict[str, float] = {}
+
+        if focused_paths:
+            for path in focused_paths:
+                weights[path] = weights.get(path, 1.0) + 1.0
+
+        if mentioned_symbols:
+            symbol_defs = {node.name: node.path for node in nodes}
+            for symbol in mentioned_symbols:
+                if symbol in symbol_defs:
+                    path = symbol_defs[symbol]
+                    weights[path] = weights.get(path, 1.0) + 0.5
+
+        return weights

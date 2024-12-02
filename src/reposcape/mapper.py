@@ -7,9 +7,8 @@ import warnings
 
 from upath import UPath
 
-from reposcape.analyzers import PythonAstAnalyzer
-from reposcape.analyzers.text import TextAnalyzer
-from reposcape.importance import FrequencyCalculator
+from reposcape.analyzers import PythonAstAnalyzer, TextAnalyzer
+from reposcape.importance import ImportanceCalculator, ReferenceScorer
 from reposcape.models import CodeNode, DetailLevel, NodeType
 from reposcape.serializers import MarkdownSerializer
 
@@ -19,7 +18,7 @@ if TYPE_CHECKING:
     from os import PathLike
 
     from reposcape.analyzers import CodeAnalyzer
-    from reposcape.importance import ImportanceCalculator
+    from reposcape.importance import GraphScorer
     from reposcape.serializers import CodeSerializer
 
 
@@ -30,14 +29,14 @@ class RepoMapper:
         self,
         *,
         analyzers: Sequence[CodeAnalyzer] | None = None,
-        importance_calculator: ImportanceCalculator | None = None,
+        scorer: GraphScorer | None = None,
         serializer: CodeSerializer | None = None,
     ):
         """Initialize RepoMapper.
 
         Args:
             analyzers: Code analyzers to use, defaults to [PythonAstAnalyzer]
-            importance_calculator: Calculator for importance scores
+            scorer: Graph scorer for importance calculation
             serializer: Serializer for output generation
         """
         self.analyzers = (
@@ -48,7 +47,8 @@ class RepoMapper:
                 TextAnalyzer(),
             ]
         )
-        self.importance_calculator = importance_calculator or FrequencyCalculator()
+        # Create ImportanceCalculator with provided or default scorer
+        self.importance_calculator = ImportanceCalculator(scorer or ReferenceScorer())
         self.serializer = serializer or MarkdownSerializer()
 
     def create_overview(

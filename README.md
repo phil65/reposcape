@@ -30,3 +30,37 @@
 
 [Read the documentation!](https://phil65.github.io/reposcape/)
 
+
+Usage:
+
+```python
+
+from reposcape import RepoMapper, PageRankScorer
+
+# Use PageRank scoring
+mapper = RepoMapper(scorer=PageRankScorer())
+
+# Create overview
+result = mapper.create_overview(
+    repo_path="./my_project",
+    token_limit=2000,
+)
+
+# Or use reference-based scoring
+from reposcape import ReferenceScorer
+
+mapper = RepoMapper(
+    scorer=ReferenceScorer(
+        ref_weight=1.0,
+        outref_weight=0.5,
+        important_ref_boost=2.0,
+        distance_decay=0.5,
+    )
+)
+# Create focused view
+result = mapper.create_focused_view(
+    files=["src/main.py"],
+    repo_path="./my_project",
+    token_limit=1000,
+)
+```
