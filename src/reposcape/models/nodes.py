@@ -30,6 +30,7 @@ class Reference:
     path: str  # Path to the file containing the reference
     line: int
     column: int
+    module_reference: bool = False
 
 
 @dataclass(frozen=True)

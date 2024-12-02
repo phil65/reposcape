@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import ast
 import dataclasses
-from dataclasses import dataclass
+import inspect
 from typing import TYPE_CHECKING, Any
 
 from upath import UPath
@@ -15,15 +15,23 @@ from reposcape.models.nodes import CodeNode, NodeType, Reference
 
 if TYPE_CHECKING:
     from os import PathLike
+    from types import ModuleType
 
 
-@dataclass
 class SymbolCollector(ast.NodeVisitor):
     """Collect symbols and their references from Python AST."""
 
-    path: str
-    symbols: dict[str, CodeNode]
-    references: list[Reference]
+    def __init__(
+        self,
+        path: str,
+        symbols: dict[str, CodeNode],
+        references: list[Reference],
+    ) -> None:
+        self.path = path
+        self.symbols = symbols
+        self.references = references
+        # Track import aliases
+        self.import_map: dict[str, str] = {}
 
     def visit_ClassDef(self, node: ast.ClassDef) -> Any:  # noqa: N802
         """Process class definitions."""
@@ -57,6 +65,21 @@ class SymbolCollector(ast.NodeVisitor):
 
         self.symbols = old_symbols
         self.symbols[node.name] = class_node
+
+    def visit_Name(self, node: ast.Name) -> Any:  # noqa: N802
+        """Process name references."""
+        if isinstance(node.ctx, ast.Load):
+            # Check if this is a reference to an imported name
+            ref_name = self.import_map.get(node.id, node.id)
+            self.references.append(
+                Reference(
+                    name=ref_name,
+                    path=self.path,
+                    line=node.lineno,
+                    column=node.col_offset,
+                    module_reference=ref_name in self.import_map,
+                )
+            )
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> Any:  # noqa: N802
         """Process function definitions."""
@@ -115,27 +138,35 @@ class SymbolCollector(ast.NodeVisitor):
             self._add_references_from_expr(kw.value)
         self.generic_visit(node)
 
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> Any:  # noqa: N802
-        """Process from-imports to track references."""
-        for alias in node.names:
-            self.references.append(
-                Reference(
-                    name=alias.name,
-                    path=self.path,
-                    line=node.lineno,
-                    column=node.col_offset,
-                )
-            )
-
     def visit_Import(self, node: ast.Import) -> Any:  # noqa: N802
         """Process imports to track references."""
         for alias in node.names:
+            asname = alias.asname or alias.name
+            self.import_map[asname] = alias.name
             self.references.append(
                 Reference(
                     name=alias.name,
                     path=self.path,
                     line=node.lineno,
                     column=node.col_offset,
+                    module_reference=True,  # New field
+                )
+            )
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> Any:  # noqa: N802
+        """Process from-imports to track references."""
+        module = node.module or ""
+        for alias in node.names:
+            asname = alias.asname or alias.name
+            full_name = f"{module}.{alias.name}" if module else alias.name
+            self.import_map[asname] = full_name
+            self.references.append(
+                Reference(
+                    name=full_name,
+                    path=self.path,
+                    line=node.lineno,
+                    column=node.col_offset,
+                    module_reference=True,
                 )
             )
 
@@ -213,3 +244,49 @@ class PythonAstAnalyzer(CodeAnalyzer):
             references_to=collector.references,
         )
         return [node]
+
+    def analyze_module(self, module: ModuleType) -> list[CodeNode]:
+        """Analyze a Python module object.
+
+        Args:
+            module: Module to analyze
+
+        Returns:
+            List of CodeNode objects representing the module structure
+        """
+        # Get module source if available
+        try:
+            source = inspect.getsource(module)
+        except (TypeError, OSError) as e:
+            msg = f"Could not get source for module {module.__name__}"
+            raise ValueError(msg) from e
+
+        # Parse the AST
+        tree = ast.parse(source)
+        ast.fix_missing_locations(tree)
+
+        # Add parent links
+        for parent in ast.walk(tree):
+            for child in ast.iter_child_nodes(parent):
+                child.parent = parent  # type: ignore[attr-defined]
+
+        # Collect symbols
+        collector = SymbolCollector(
+            path=module.__file__ or module.__name__,
+            symbols={},
+            references=[],
+        )
+        collector.visit(tree)
+
+        # Create module node
+        return [
+            CodeNode(
+                name=module.__name__,
+                node_type=NodeType.FILE,
+                path=module.__file__ or module.__name__,
+                content=source,
+                docstring=module.__doc__,
+                children=collector.symbols,
+                references_to=collector.references,
+            )
+        ]

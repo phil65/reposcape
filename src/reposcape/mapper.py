@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import importlib
+import pkgutil
+from types import ModuleType
+from typing import TYPE_CHECKING, overload
 import warnings
 
 from upath import UPath
@@ -51,6 +54,7 @@ class RepoMapper:
         self.importance_calculator = ImportanceCalculator(scorer or ReferenceScorer())
         self.serializer = serializer or MarkdownSerializer()
 
+    @overload
     def create_overview(
         self,
         repo_path: str | PathLike[str],
@@ -58,35 +62,118 @@ class RepoMapper:
         token_limit: int | None = None,
         detail: DetailLevel = DetailLevel.SIGNATURES,
         exclude_patterns: list[str] | None = None,
+    ) -> str: ...
+
+    @overload
+    def create_overview(
+        self,
+        repo_path: ModuleType,
+        *,
+        token_limit: int | None = None,
+        detail: DetailLevel = DetailLevel.SIGNATURES,
+    ) -> str: ...
+
+    def create_overview(
+        self,
+        repo_path: str | PathLike[str] | ModuleType,
+        *,
+        root_package: ModuleType | None = None,
+        token_limit: int | None = None,
+        detail: DetailLevel = DetailLevel.SIGNATURES,
+        exclude_patterns: list[str] | None = None,
     ) -> str:
-        """Create a high-level overview of the entire repository.
+        """Create a high-level overview.
 
         Args:
-            repo_path: Path to repository root
+            repo_path: Path to repository root or Python module to analyze
+            root_package: Optional parent package to consider for references
+                When analyzing a module, references to other modules within
+                root_package will be included in the analysis.
             token_limit: Maximum tokens in output
             detail: Level of detail to include
             exclude_patterns: Glob patterns for paths to exclude
-
-        Returns:
-            Structured overview of the repository
         """
-        repo_path = UPath(repo_path)
-
-        # Analyze repository structure
-        root_node = self._analyze_repository(
-            repo_path,
-            exclude_patterns=exclude_patterns,
-        )
-
-        # Calculate importance scores
+        if isinstance(repo_path, ModuleType):
+            # If no root_package specified, only analyze repo_path's tree
+            pkg_name = (root_package or repo_path).__name__
+            root_node = self._analyze_module(repo_path, pkg_name)
+        else:
+            root_node = self._analyze_repository(
+                UPath(repo_path),
+                exclude_patterns=exclude_patterns,
+            )
         self._calculate_importance(root_node)
-
-        # Generate output
         return self.serializer.serialize(
             root_node,
             detail=detail,
             token_limit=token_limit,
         )
+
+    def _analyze_module(self, module: ModuleType, package_name: str) -> CodeNode:
+        """Analyze a Python module and its submodules.
+
+        Only analyzes modules that are part of the specified package.
+
+        Args:
+            module: Module to analyze
+            package_name: Package namespace to analyze
+        """
+        try:
+            # Check if module is part of our package
+            if not module.__name__.startswith(package_name):
+                msg = f"Module {module.__name__} is not part of package {package_name}"
+                raise ValueError(msg)  # noqa: TRY301
+
+            analyzer = next(
+                (a for a in self.analyzers if isinstance(a, PythonAstAnalyzer)),
+                None,
+            )
+            if not analyzer:
+                msg = "No suitable analyzer found for Python module"
+                raise ValueError(msg)  # noqa: TRY301
+
+            # Analyze main module
+            nodes = analyzer.analyze_module(module)
+            if not nodes:
+                msg = f"No nodes generated for module {module.__name__}"
+                raise ValueError(msg)  # noqa: TRY301
+            root_node = nodes[0]
+
+            # Handle submodules if this is a package
+            if hasattr(module, "__path__"):
+                children = root_node.children or {}
+
+                # Iterate through all submodules
+                for module_info in pkgutil.iter_modules(module.__path__):
+                    if not module_info.ispkg:  # Skip recursive packages for now
+                        # Import submodule
+                        submodule_name = f"{module.__name__}.{module_info.name}"
+                        if submodule_name.startswith(package_name):
+                            try:
+                                submodule = importlib.import_module(submodule_name)
+                                # Recursively analyze submodule
+                                sub_node = self._analyze_module(submodule, package_name)
+                                children[module_info.name] = sub_node  # type: ignore
+                            except Exception as e:  # noqa: BLE001
+                                warnings.warn(
+                                    f"Failed to analyze submodule {submodule_name}: {e}",
+                                    RuntimeWarning,
+                                    stacklevel=1,
+                                )
+
+                # Update root node with submodule children
+                object.__setattr__(root_node, "children", children)
+        except Exception as e:  # noqa: BLE001
+            msg = f"Error analyzing module {module.__name__}: {e}"
+            warnings.warn(msg, RuntimeWarning, stacklevel=1)
+            return CodeNode(
+                name=module.__name__,
+                node_type=NodeType.FILE,
+                path=module.__file__ or module.__name__,
+                docstring=module.__doc__,
+            )
+        else:
+            return root_node
 
     def create_focused_view(
         self,

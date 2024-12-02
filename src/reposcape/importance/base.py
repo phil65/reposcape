@@ -56,13 +56,21 @@ class ImportanceCalculator:
 
         # First pass: add all nodes and collect symbol definitions
         symbol_defs: dict[str, str] = {}
+        module_defs: dict[str, str] = {}
+
         for node in nodes:
             graph.add_node(node.path)
-            symbol_defs[node.name] = node.path
 
+            # Track both local symbols and module names
+            module_name = node.path.replace("/", ".")
+            if module_name.endswith(".py"):
+                module_name = module_name[:-3]
+            module_defs[module_name] = node.path
+
+            symbol_defs[node.name] = node.path
             if node.children:
                 for child in node.children.values():
-                    symbol_defs[child.name] = node.path
+                    symbol_defs[child.name] = child.path
 
         # Second pass: add edges
         for node in nodes:
@@ -74,7 +82,17 @@ class ImportanceCalculator:
             # Add reference relationships
             if node.references_to:
                 for ref in node.references_to:
-                    if ref.name in symbol_defs:
+                    if ref.module_reference:
+                        # Handle module references
+                        parts = ref.name.split(".")
+                        for i in range(len(parts)):
+                            module_path = ".".join(parts[: i + 1])
+                            if module_path in module_defs:
+                                target = module_defs[module_path]
+                                graph.add_edge(node.path, target, weight=0.7)
+                                break
+                    # Handle local references
+                    elif ref.name in symbol_defs:
                         target = symbol_defs[ref.name]
                         graph.add_edge(node.path, target, weight=0.5)
 
