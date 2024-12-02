@@ -18,8 +18,10 @@ class NodeType(Enum):
     FILE = auto()
     CLASS = auto()
     FUNCTION = auto()
+    ASYNC_FUNCTION = auto()
     METHOD = auto()
     VARIABLE = auto()
+    ASYNC_METHOD = auto()
 
 
 @dataclass(frozen=True)
@@ -31,6 +33,7 @@ class Reference:
     line: int
     column: int
     module_reference: bool = False
+    source: CodeNode | None = None
 
 
 @dataclass(frozen=True)
@@ -48,6 +51,8 @@ class CodeNode:
     references_to: Sequence[Reference] | None = None  # Symbols this node references
     referenced_by: Sequence[Reference] | None = None  # References to this node
     importance: float = 0.0
+    is_private: bool = False
+    parent: CodeNode | None = None
 
     def __post_init__(self):
         """Initialize empty collections if None."""

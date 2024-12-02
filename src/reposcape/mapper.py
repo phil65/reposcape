@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 import pkgutil
 from types import ModuleType
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING, overload
 import warnings
 
 from upath import UPath
@@ -27,8 +27,7 @@ if TYPE_CHECKING:
 
     from reposcape.analyzers import CodeAnalyzer
     from reposcape.importance import GraphScorer
-
-SerializerType = Literal["markdown", "compact", "tree"]
+    from reposcape.models.options import FormatType, PrivacyMode
 
 
 class RepoMapper:
@@ -39,7 +38,7 @@ class RepoMapper:
         *,
         analyzers: Sequence[CodeAnalyzer] | None = None,
         scorer: GraphScorer | None = None,
-        serializer: SerializerType | CodeSerializer = "markdown",
+        serializer: FormatType | CodeSerializer = "markdown",
     ):
         """Initialize RepoMapper.
 
@@ -92,6 +91,7 @@ class RepoMapper:
         detail: DetailLevel = DetailLevel.SIGNATURES,
         exclude_patterns: list[str] | None = None,
         root_package: ModuleType | None = None,
+        privacy: PrivacyMode = "smart",
     ) -> str:
         """Create a high-level overview.
 
@@ -103,6 +103,7 @@ class RepoMapper:
             token_limit: Maximum tokens in output
             detail: Level of detail to include
             exclude_patterns: Glob patterns for paths to exclude
+            privacy: Whether to include private functions / classes
         """
         if isinstance(repo_path, ModuleType):
             # If no root_package specified, only analyze repo_path's tree
@@ -118,6 +119,7 @@ class RepoMapper:
             root_node,
             detail=detail,
             token_limit=token_limit,
+            privacy=privacy,
         )
 
     def _analyze_module(self, module: ModuleType, package_name: str) -> CodeNode:
@@ -218,6 +220,7 @@ class RepoMapper:
         detail: DetailLevel = DetailLevel.SIGNATURES,
         exclude_patterns: list[str] | None = None,
         root_package: ModuleType | None = None,
+        privacy: PrivacyMode = "smart",
     ) -> str:
         """Create a view focused on specific files and their relationships.
 
@@ -230,6 +233,7 @@ class RepoMapper:
             root_package: Optional parent package to consider for references
                 When analyzing a module, references to other modules within
                 root_package will be included in the analysis.
+            privacy: Whether to include private functions / classes
 
         Returns:
             Structured view focused on specified files
@@ -256,9 +260,7 @@ class RepoMapper:
 
         # Generate output
         return self.serializer.serialize(
-            root_node,
-            detail=detail,
-            token_limit=token_limit,
+            root_node, detail=detail, token_limit=token_limit, privacy=privacy
         )
 
     def _analyze_repository(
@@ -325,28 +327,28 @@ class RepoMapper:
         return root
 
     def _add_to_tree(
-        self,
-        root: CodeNode,
-        rel_path: UPath,
-        nodes: list[CodeNode],
+        self, root: CodeNode, rel_path: UPath, nodes: list[CodeNode]
     ) -> None:
         """Add analyzed nodes to the tree structure."""
-        # Ensure parent directories exist
         current = root
         for part in rel_path.parent.parts:
             assert current.children is not None
             if part not in current.children:
-                current.children[part] = CodeNode(  # type: ignore
+                new_node = CodeNode(
                     name=part,
                     node_type=NodeType.DIRECTORY,
                     path=str(UPath(current.path) / part),
                     children={},
+                    parent=current,  # Set parent reference
                 )
+                current.children[part] = new_node  # type: ignore
             current = current.children[part]
 
         # Add file and its nodes
         if nodes:
-            current.children[rel_path.name] = nodes[0]  # type: ignore
+            node = nodes[0]
+            object.__setattr__(node, "parent", current)  # Set parent reference
+            current.children[rel_path.name] = node  # type: ignore
 
     def _calculate_importance(
         self,

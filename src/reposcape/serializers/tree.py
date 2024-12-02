@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from reposcape.models.nodes import NodeType
-from reposcape.models.options import DetailLevel
+from reposcape.models.options import DetailLevel, PrivacyMode
 from reposcape.serializers.base import CodeSerializer
 
 
@@ -16,49 +16,63 @@ if TYPE_CHECKING:
 class TreeSerializer(CodeSerializer):
     """Serialize code structure in a tree-like format."""
 
-    def serialize(
+    def _serialize_node(
         self,
-        root: CodeNode,
+        node: CodeNode,
         *,
         detail: DetailLevel,
-        max_depth: int | None = None,
-        token_limit: int | None = None,
+        privacy: PrivacyMode,
     ) -> str:
-        """Convert structure to tree format."""
         lines: list[str] = []
-        self._serialize_node(
+        self._serialize_node_with_children(
+            node,
+            lines,
+            is_last=[True],
+            detail=detail,
+            privacy=privacy,
+        )
+        return "\n".join(lines)
+
+    def _serialize_filtered(
+        self,
+        root: CodeNode,
+        included: set[str],
+        detail: DetailLevel,
+    ) -> str:
+        lines: list[str] = []
+        self._serialize_node_with_children(
             root,
             lines,
             is_last=[True],
             detail=detail,
-            max_depth=max_depth,
-            remaining_tokens=token_limit,
+            included=included,
         )
         return "\n".join(lines)
 
-    def _serialize_node(
+    def _serialize_node_with_children(
         self,
         node: CodeNode,
         lines: list[str],
         *,
         is_last: list[bool],
         detail: DetailLevel,
-        max_depth: int | None,
-        remaining_tokens: int | None,
-    ) -> int:
+        privacy: PrivacyMode = "smart",
+        included: set[str] | None = None,
+    ) -> None:
         """Serialize node in tree format."""
-        depth = len(is_last) - 1
-        if not self._should_include_node(node, depth, max_depth):
-            return 0
+        if not self._should_include_node(node, included, privacy):
+            return
 
-        # Create the prefix
+        # Create the prefix with tree structure
         if len(is_last) == 1:
             prefix = ""
         else:
             prefix = "".join("    " if last else "│   " for last in is_last[1:-1])
             prefix += "└── " if is_last[-1] else "├── "
 
-        # Format node
+        # Format node with privacy indicator
+        privacy_indicator = "🔒" if node.is_private else ""
+
         match node.node_type:
             case NodeType.DIRECTORY:
                 line = f"{prefix}{node.name}/"
@@ -67,37 +81,25 @@ class TreeSerializer(CodeSerializer):
             case _:
                 if detail != DetailLevel.STRUCTURE and node.signature:
                     sig = node.signature.replace("\n", " ").replace("    ", "")
-                    line = f"{prefix}{sig}"
+                    line = f"{prefix}{privacy_indicator}{sig}"
                 else:
-                    line = f"{prefix}{node.name}"
-
-        tokens_used = self._estimate_tokens(line)
-        if remaining_tokens is not None:
-            remaining_tokens -= tokens_used
-            if remaining_tokens <= 0:
-                return tokens_used
+                    line = f"{prefix}{privacy_indicator}{node.name}"
 
         lines.append(line)
 
         # Process children
         if node.children:
             children = sorted(
-                node.children.values(), key=lambda n: (-n.importance, n.name)
+                node.children.values(),
+                key=lambda n: (-n.importance, n.name),
             )
             for i, child in enumerate(children):
                 is_last_child = i == len(children) - 1
-                child_tokens = self._serialize_node(
+                self._serialize_node_with_children(
                     child,
                     lines,
                     is_last=[*is_last, is_last_child],
                     detail=detail,
-                    max_depth=max_depth,
-                    remaining_tokens=remaining_tokens,
+                    privacy=privacy,
+                    included=included,
                 )
-                tokens_used += child_tokens
-                if remaining_tokens is not None:
-                    remaining_tokens -= child_tokens
-                    if remaining_tokens <= 0:
-                        break
-
-        return tokens_used

@@ -15,4 +15,6 @@ class DetailLevel(Enum):
     FULL_CODE = auto()  # Include complete implementations
 
 
+# Format type and privacy mode as literals
 FormatType = Literal["markdown", "compact", "tree"]
+PrivacyMode = Literal["public_only", "all", "smart"]

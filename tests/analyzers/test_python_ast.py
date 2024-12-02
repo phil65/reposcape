@@ -58,6 +58,38 @@ def test_analyze_simple_file(simple_python_file: str):
     assert "-> bool" in func.signature
 
 
+def test_analyze_async_functions():
+    """Test analysis of async functions and methods."""
+    content = '''
+async def top_level_async():
+    """Async function."""
+    return 42
+
+class AsyncClass:
+    """Class with async method."""
+
+    async def async_method(self):
+        """Async method."""
+        await top_level_async()
+'''
+    analyzer = PythonAstAnalyzer()
+    nodes = analyzer.analyze_file("test.py", content=content)
+
+    root = nodes[0]
+    assert root.children is not None
+    assert "top_level_async" in root.children
+    assert root.children is not None
+    assert root.children["top_level_async"].signature is not None
+    assert root.children["top_level_async"].signature.startswith("async def")
+
+    class_node = root.children["AsyncClass"]
+    assert class_node.children is not None
+    assert "async_method" in class_node.children
+    assert class_node.children is not None
+    assert class_node.children["async_method"].signature
+    assert class_node.children["async_method"].signature.startswith("async def")
+
+
 def test_reference_tracking(complex_python_file: str):
     """Test that references between symbols are tracked correctly."""
     analyzer = PythonAstAnalyzer()

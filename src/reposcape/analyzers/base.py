@@ -15,6 +15,10 @@ if TYPE_CHECKING:
 class CodeAnalyzer(ABC):
     """Abstract base class for code analysis."""
 
+    def _is_private(self, name: str) -> bool:
+        """Check if a name represents a private element."""
+        return name.startswith("_") and not name.endswith("_")
+
     @abstractmethod
     def can_handle(self, path: str | PathLike[str]) -> bool:
         """Check if this analyzer can handle the given file."""

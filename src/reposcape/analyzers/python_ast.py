@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ast
-import dataclasses
 import inspect
 from typing import TYPE_CHECKING, Any
 
@@ -30,8 +29,12 @@ class SymbolCollector(ast.NodeVisitor):
         self.path = path
         self.symbols = symbols
         self.references = references
-        # Track import aliases
         self.import_map: dict[str, str] = {}
+        self.current_node: CodeNode | None = None
+
+    def _is_private(self, name: str) -> bool:
+        """Check if a name represents a private element."""
+        return name.startswith("_") and not name.endswith("_")
 
     def visit_ClassDef(self, node: ast.ClassDef) -> Any:  # noqa: N802
         """Process class definitions."""
@@ -51,35 +54,21 @@ class SymbolCollector(ast.NodeVisitor):
             docstring=ast.get_docstring(node),
             signature=self._get_class_signature(node),
             children={},
+            is_private=self._is_private(node.name),
         )
 
-        # Process class body
-        old_symbols = self.symbols
-        self.symbols = {}
+        # Store class node before visiting children
+        old_current = self.current_node
+        self.current_node = class_node
+
+        # Visit class body with original symbols
         self.generic_visit(node)
 
-        # Add methods to class
-        class_dict = dataclasses.asdict(class_node)
-        class_dict["children"] = self.symbols
-        class_node = CodeNode(**class_dict)
+        # Restore current node
+        self.current_node = old_current
 
-        self.symbols = old_symbols
+        # Add class to symbols
         self.symbols[node.name] = class_node
-
-    def visit_Name(self, node: ast.Name) -> Any:  # noqa: N802
-        """Process name references."""
-        if isinstance(node.ctx, ast.Load):
-            # Check if this is a reference to an imported name
-            ref_name = self.import_map.get(node.id, node.id)
-            self.references.append(
-                Reference(
-                    name=ref_name,
-                    path=self.path,
-                    line=node.lineno,
-                    column=node.col_offset,
-                    module_reference=ref_name in self.import_map,
-                )
-            )
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> Any:  # noqa: N802
         """Process function definitions."""
@@ -96,16 +85,97 @@ class SymbolCollector(ast.NodeVisitor):
             if arg.annotation:
                 self._add_references_from_expr(arg.annotation)
 
-        self.symbols[node.name] = CodeNode(
+        # Create function node
+        is_method = isinstance(node.parent, ast.ClassDef)  # type: ignore[attr-defined]
+        func_node = CodeNode(
             name=node.name,
-            node_type=NodeType.METHOD
-            if isinstance(node.parent, ast.ClassDef)  # type: ignore[attr-defined]
-            else NodeType.FUNCTION,
+            node_type=NodeType.METHOD if is_method else NodeType.FUNCTION,
             path=self.path,
             docstring=ast.get_docstring(node),
             signature=self._get_function_signature(node),
+            is_private=self._is_private(node.name),
+            parent=self.current_node if is_method else None,
         )
+
+        # For methods, add to class's children
+        if is_method and isinstance(self.current_node, CodeNode):
+            assert self.current_node.children is not None
+            object.__setattr__(
+                self.current_node,
+                "children",
+                {**self.current_node.children, node.name: func_node},
+            )
+        else:
+            # Top-level functions go in main symbols
+            self.symbols[node.name] = func_node
+
+        # Process function body
+        old_current = self.current_node
+        self.current_node = func_node
         self.generic_visit(node)
+        self.current_node = old_current
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> Any:  # noqa: N802
+        """Process async function definitions."""
+        is_method = isinstance(node.parent, ast.ClassDef)  # type: ignore[attr-defined]
+
+        # Create function node
+        func_node = CodeNode(
+            name=node.name,
+            node_type=NodeType.ASYNC_METHOD if is_method else NodeType.ASYNC_FUNCTION,
+            path=self.path,
+            docstring=ast.get_docstring(node),
+            signature=self._get_async_function_signature(node),
+            children={},
+            is_private=self._is_private(node.name),
+            parent=self.current_node,
+        )
+
+        # For methods, add to class's children
+        if is_method and isinstance(self.current_node, CodeNode):
+            assert self.current_node.children is not None
+            object.__setattr__(
+                self.current_node,
+                "children",
+                {**self.current_node.children, node.name: func_node},
+            )
+        else:
+            # Top-level functions go in main symbols
+            self.symbols[node.name] = func_node
+
+        # Process function body
+        old_current = self.current_node
+        self.current_node = func_node
+        self.generic_visit(node)
+        self.current_node = old_current
+
+    def _get_async_function_signature(self, node: ast.AsyncFunctionDef) -> str:
+        """Generate async function signature."""
+        args = []
+        for arg in node.args.args:
+            arg_str = arg.arg
+            if arg.annotation:
+                arg_str += f": {ast.unparse(arg.annotation)}"
+            args.append(arg_str)
+
+        returns = f" -> {ast.unparse(node.returns)}" if node.returns else ""
+        return f"async def {node.name}({', '.join(args)}){returns}"
+
+    def visit_Name(self, node: ast.Name) -> Any:  # noqa: N802
+        """Process name references."""
+        if isinstance(node.ctx, ast.Load):
+            # Check if this is a reference to an imported name
+            ref_name = self.import_map.get(node.id, node.id)
+            self.references.append(
+                Reference(
+                    name=ref_name,
+                    path=self.path,
+                    line=node.lineno,
+                    column=node.col_offset,
+                    module_reference=ref_name in self.import_map,
+                    source=self.current_node,
+                )
+            )
 
     def _add_references_from_expr(self, node: ast.expr) -> None:
         """Extract references from an expression node."""
