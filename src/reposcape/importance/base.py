@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from reposcape.importance.graph import RustworkxGraph
+from reposcape.importance.graph import Graph
 
 
 if TYPE_CHECKING:
@@ -50,9 +50,9 @@ class ImportanceCalculator:
             weights=weights,
         )
 
-    def _build_graph(self, nodes: Sequence[CodeNode]) -> RustworkxGraph:
+    def _build_graph(self, nodes: Sequence[CodeNode]) -> Graph:
         """Build graph from code nodes."""
-        graph = RustworkxGraph()
+        graph = Graph()
 
         # First pass: add all nodes and collect symbol definitions
         symbol_defs: dict[str, str] = {}

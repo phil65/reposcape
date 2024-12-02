@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from .base import ImportanceCalculator
-from .graph import Graph, RustworkxGraph
-from .scoring import GraphScorer, PageRankScorer, ReferenceScorer
+from reposcape.importance.base import ImportanceCalculator
+from reposcape.importance.graph import Graph
+from reposcape.importance.scoring import GraphScorer, PageRankScorer, ReferenceScorer
 
 __all__ = [
     "Graph",
@@ -12,5 +12,4 @@ __all__ = [
     "ImportanceCalculator",
     "PageRankScorer",
     "ReferenceScorer",
-    "RustworkxGraph",
 ]

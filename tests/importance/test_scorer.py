@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from reposcape.importance.graph import RustworkxGraph
+from reposcape.importance.graph import Graph
 from reposcape.importance.scoring import PageRankScorer, ReferenceScorer
 
 
 @pytest.fixture
-def simple_graph() -> RustworkxGraph:
+def simple_graph() -> Graph:
     """Create a simple example graph for testing."""
-    graph = RustworkxGraph()
+    graph = Graph()
 
     # Create a simple reference chain: a -> b -> c
     graph.add_edge("a", "b", weight=1.0)
@@ -21,9 +21,9 @@ def simple_graph() -> RustworkxGraph:
 
 
 @pytest.fixture
-def complex_graph() -> RustworkxGraph:
+def complex_graph() -> Graph:
     """Create a more complex graph for testing."""
-    graph = RustworkxGraph()
+    graph = Graph()
 
     # Create a hub-and-spoke structure with weighted edges
     graph.add_edge("hub", "spoke1", weight=0.5)
@@ -36,7 +36,7 @@ def complex_graph() -> RustworkxGraph:
     return graph
 
 
-def test_reference_scorer_with_important_nodes(complex_graph: RustworkxGraph):
+def test_reference_scorer_with_important_nodes(complex_graph: Graph):
     """Test ReferenceScorer with specified important nodes."""
     scorer = ReferenceScorer()
     scores = scorer.score(
@@ -53,7 +53,7 @@ def test_reference_scorer_with_important_nodes(complex_graph: RustworkxGraph):
     assert scores["spoke1"] > scores["spoke2"]
 
 
-def test_pagerank_scorer_with_cycle(complex_graph: RustworkxGraph):
+def test_pagerank_scorer_with_cycle(complex_graph: Graph):
     """Test PageRankScorer on graph containing cycles."""
     scorer = PageRankScorer()
     scores = scorer.score(complex_graph)
@@ -84,7 +84,7 @@ def test_pagerank_scorer_with_cycle(complex_graph: RustworkxGraph):
 
 def test_invalid_graph_handling():
     """Test scorers' handling of invalid/empty graphs."""
-    empty_graph = RustworkxGraph()
+    empty_graph = Graph()
 
     ref_scorer = ReferenceScorer()
     page_scorer = PageRankScorer()
@@ -94,7 +94,7 @@ def test_invalid_graph_handling():
     assert page_scorer.score(empty_graph) == {}
 
     # Important nodes that don't exist should be ignored
-    graph = RustworkxGraph()
+    graph = Graph()
     graph.add_edge("a", "b", weight=1.0)
 
     # Should not raise error with non-existent nodes

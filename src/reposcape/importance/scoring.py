@@ -51,6 +51,7 @@ class ReferenceScorer(GraphScorer):
         outref_weight: float = 0.5,
         important_ref_boost: float = 2.0,
         distance_decay: float = 0.5,
+        focus_boost: float = 5.0,  # Add focus boost parameter
     ):
         """Initialize scorer with weights.
 
@@ -59,11 +60,13 @@ class ReferenceScorer(GraphScorer):
             outref_weight: Weight for outgoing references
             important_ref_boost: Boost when referenced by important nodes
             distance_decay: How quickly importance decreases with distance
+            focus_boost: Multiplier for focused nodes
         """
         self.ref_weight = ref_weight
         self.outref_weight = outref_weight
         self.important_ref_boost = important_ref_boost
         self.distance_decay = distance_decay
+        self.focus_boost = focus_boost
 
     def score(
         self,
@@ -77,46 +80,28 @@ class ReferenceScorer(GraphScorer):
         }
         weights = {k: v for k, v in (weights or {}).items() if k in graph.get_nodes()}
 
-        # Get rustworkx graph for efficient operations
-        rx_graph = graph.get_graph()
-
-        # Initialize base scores
+        # Initialize scores
         scores: dict[str, float] = {node: 0.0 for node in graph.get_nodes()}
 
-        # Add scores from reference counts
+        # Add base scores from references
         for node_id in graph.get_nodes():
             idx = graph.get_node_index(node_id)
 
             # Incoming references score
-            in_edges = rx_graph.in_edges(idx)
+            in_edges = graph.get_graph().in_edges(idx)
             scores[node_id] += len(in_edges) * self.ref_weight
 
-            # Extra score for references from important nodes
-            if important_nodes:
-                important_refs = sum(
-                    1
-                    for source, _, _ in in_edges
-                    if self._get_node_id(graph, source) in important_nodes
-                )
-                scores[node_id] += important_refs * self.important_ref_boost
-
             # Outgoing references score
-            out_edges = rx_graph.out_edges(idx)
+            out_edges = graph.get_graph().out_edges(idx)
             scores[node_id] += len(out_edges) * self.outref_weight
 
-        # Add pre-defined weights
+        # Apply focus boost to important nodes
+        for node_id in important_nodes:
+            scores[node_id] *= self.focus_boost
+
+        # Apply additional weights
         for node_id, weight in weights.items():
             scores[node_id] *= weight
-
-        # Add distance-based scores if there are important nodes
-        if important_nodes:
-            try:
-                distance_scores = self._calculate_distance_scores(graph, important_nodes)
-                for node_id, distance_score in distance_scores.items():
-                    scores[node_id] += distance_score
-            except KeyError:
-                # Ignore distance scoring if any node is missing
-                pass
 
         return self._normalize_scores(scores)
 

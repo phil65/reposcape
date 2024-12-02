@@ -1,33 +1,9 @@
 from __future__ import annotations
 
-from typing import Protocol
-
 import rustworkx as rx
 
 
-class Graph(Protocol):
-    """Graph interface that different implementations can satisfy."""
-
-    def add_node(self, node_id: str) -> None:
-        """Add a node to the graph."""
-
-    def add_edge(self, from_id: str, to_id: str, weight: float = 1.0) -> None:
-        """Add a weighted edge between nodes."""
-
-    def get_nodes(self) -> set[str]:
-        """Get all node IDs."""
-
-    def get_edges(self, node_id: str) -> dict[str, float]:
-        """Get outgoing edges and their weights for a node."""
-
-    def get_graph(self) -> rx.PyDiGraph:
-        """Get underlying rustworkx graph."""
-
-    def get_node_index(self, node_id: str) -> int:
-        """Get rustworkx node index for node_id."""
-
-
-class RustworkxGraph:
+class Graph:
     """Default graph implementation using rustworkx."""
 
     def __init__(self) -> None:
@@ -35,11 +11,26 @@ class RustworkxGraph:
         self.graph = rx.PyDiGraph()
         self.node_map: dict[str, int] = {}
 
-    def add_node(self, node_id: str) -> None:
-        """Add a node to the graph."""
+    def add_node(self, node_id: str) -> int:
+        """Add a node to the graph.
+
+        Args:
+            node_id: Unique identifier for the node
+
+        Returns:
+            Index of the node in the graph
+        """
         if node_id not in self.node_map:
             idx = self.graph.add_node(node_id)
             self.node_map[node_id] = idx
+        return self.node_map[node_id]
+
+    def remove_node(self, node_id: str) -> None:
+        """Remove a node and its edges from the graph."""
+        if node_id in self.node_map:
+            idx = self.node_map[node_id]
+            self.graph.remove_node(idx)
+            del self.node_map[node_id]
 
     def add_edge(self, from_id: str, to_id: str, weight: float = 1.0) -> None:
         """Add a weighted edge between nodes."""
