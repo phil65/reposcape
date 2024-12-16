@@ -71,6 +71,7 @@ class RepoMapper:
         detail: DetailLevel = DetailLevel.SIGNATURES,
         exclude_patterns: list[str] | None = None,
         root_package: None = None,
+        privacy: PrivacyMode = "smart",
     ) -> str: ...
 
     @overload
@@ -80,7 +81,9 @@ class RepoMapper:
         *,
         token_limit: int | None = None,
         detail: DetailLevel = DetailLevel.SIGNATURES,
+        exclude_patterns: None = None,
         root_package: ModuleType | None = None,
+        privacy: PrivacyMode = "smart",
     ) -> str: ...
 
     def create_overview(
@@ -198,17 +201,20 @@ class RepoMapper:
         detail: DetailLevel = DetailLevel.SIGNATURES,
         exclude_patterns: list[str] | None = None,
         root_package: None = None,
+        privacy: PrivacyMode = "smart",
     ) -> str: ...
 
     @overload
     def create_focused_view(
         self,
-        files: Sequence[str],
+        files: Sequence[str | PathLike[str]],
         repo_path: ModuleType,
         *,
         token_limit: int | None = None,
         detail: DetailLevel = DetailLevel.SIGNATURES,
+        exclude_patterns: None = None,
         root_package: ModuleType | None = None,
+        privacy: PrivacyMode = "smart",
     ) -> str: ...
 
     def create_focused_view(
