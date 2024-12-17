@@ -163,7 +163,5 @@ class PageRankScorer(GraphScorer):
         scores = rx.pagerank(g, personalization=personalization)
 
         # Map scores back to node IDs
-        return {
-            node_id: scores[graph.get_node_index(node_id)]
-            for node_id in graph.get_nodes()
-        }
+        nodes = graph.get_nodes()
+        return {node_id: scores[graph.get_node_index(node_id)] for node_id in nodes}

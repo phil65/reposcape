@@ -44,11 +44,7 @@ class ImportanceCalculator:
         weights = self._get_weights(nodes, focused_paths, mentioned_symbols)
 
         # Calculate scores using the configured scorer
-        return self.scorer.score(
-            graph,
-            important_nodes=focused_paths,
-            weights=weights,
-        )
+        return self.scorer.score(graph, important_nodes=focused_paths, weights=weights)
 
     def _build_graph(self, nodes: Sequence[CodeNode]) -> Graph:
         """Build graph from code nodes."""
