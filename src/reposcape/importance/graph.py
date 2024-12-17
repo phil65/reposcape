@@ -8,7 +8,7 @@ class Graph:
 
     def __init__(self) -> None:
         """Initialize directed graph."""
-        self.graph = rx.PyDiGraph()
+        self.graph: rx.PyDiGraph[str, float] = rx.PyDiGraph()
         self.node_map: dict[str, int] = {}
 
     def add_node(self, node_id: str) -> int:
