@@ -36,11 +36,7 @@ class Graph:
         """Add a weighted edge between nodes."""
         self.add_node(from_id)
         self.add_node(to_id)
-        self.graph.add_edge(
-            self.node_map[from_id],
-            self.node_map[to_id],
-            weight,
-        )
+        self.graph.add_edge(self.node_map[from_id], self.node_map[to_id], weight)
 
     def get_nodes(self) -> set[str]:
         """Get all node IDs."""

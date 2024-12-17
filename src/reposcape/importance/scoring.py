@@ -120,11 +120,7 @@ class ReferenceScorer(GraphScorer):
 
             # Calculate shortest paths to all other nodes
             # Returns dict[target_idx, list[node_indices]]
-            paths = rx.dijkstra_shortest_paths(
-                rx_graph,
-                start_idx,
-                weight_fn=float,
-            )
+            paths = rx.dijkstra_shortest_paths(rx_graph, start_idx, weight_fn=float)
 
             # Convert path lengths to scores
             for node_id in graph.get_nodes():
@@ -140,11 +136,8 @@ class ReferenceScorer(GraphScorer):
 
     def _get_node_id(self, graph: Graph, index: int) -> str:
         """Get node ID from rustworkx index."""
-        return next(
-            node_id
-            for node_id in graph.get_nodes()
-            if graph.get_node_index(node_id) == index
-        )
+        nodes = graph.get_nodes()
+        return next(id_ for id_ in nodes if graph.get_node_index(id_) == index)
 
 
 class PageRankScorer(GraphScorer):
@@ -166,10 +159,8 @@ class PageRankScorer(GraphScorer):
             }
 
         # Calculate PageRank using rustworkx
-        scores = rx.pagerank(
-            graph.get_graph(),
-            personalization=personalization,
-        )
+        g = graph.get_graph()
+        scores = rx.pagerank(g, personalization=personalization)
 
         # Map scores back to node IDs
         return {
