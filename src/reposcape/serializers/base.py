@@ -3,11 +3,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, NamedTuple
 
-from reposcape.models.options import DetailLevel, PrivacyMode
+from reposcape.models.options import DetailLevel
 
 
 if TYPE_CHECKING:
     from reposcape.models.nodes import CodeNode
+    from reposcape.models.options import PrivacyMode
 
 
 class NodePriority(NamedTuple):

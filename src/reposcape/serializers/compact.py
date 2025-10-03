@@ -5,12 +5,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from reposcape.models.nodes import NodeType
-from reposcape.models.options import DetailLevel, PrivacyMode
+from reposcape.models.options import DetailLevel
 from reposcape.serializers.base import CodeSerializer
 
 
 if TYPE_CHECKING:
     from reposcape.models.nodes import CodeNode
+    from reposcape.models.options import PrivacyMode
 
 
 class CompactSerializer(CodeSerializer):

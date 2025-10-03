@@ -13,12 +13,7 @@ from upath import UPath
 from reposcape.analyzers import PythonAstAnalyzer, TextAnalyzer
 from reposcape.importance import ImportanceCalculator, ReferenceScorer
 from reposcape.models import CodeNode, DetailLevel, NodeType
-from reposcape.serializers import (
-    CodeSerializer,
-    CompactSerializer,
-    MarkdownSerializer,
-    TreeSerializer,
-)
+from reposcape.serializers import CompactSerializer, MarkdownSerializer, TreeSerializer
 
 
 if TYPE_CHECKING:
@@ -28,6 +23,7 @@ if TYPE_CHECKING:
     from reposcape.analyzers import CodeAnalyzer
     from reposcape.importance import GraphScorer
     from reposcape.models.options import FormatType, PrivacyMode
+    from reposcape.serializers import CodeSerializer
 
 
 class RepoMapper:
