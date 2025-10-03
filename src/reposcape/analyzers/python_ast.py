@@ -36,7 +36,7 @@ class SymbolCollector(ast.NodeVisitor):
         """Check if a name represents a private element."""
         return name.startswith("_") and not name.endswith("_")
 
-    def visit_ClassDef(self, node: ast.ClassDef) -> Any:  # noqa: N802
+    def visit_ClassDef(self, node: ast.ClassDef) -> Any:
         """Process class definitions."""
         # Add references from bases
         for base in node.bases:
@@ -70,7 +70,7 @@ class SymbolCollector(ast.NodeVisitor):
         # Add class to symbols
         self.symbols[node.name] = class_node
 
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> Any:  # noqa: N802
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> Any:
         """Process function definitions."""
         # Add references from decorators
         for decorator in node.decorator_list:
@@ -115,7 +115,7 @@ class SymbolCollector(ast.NodeVisitor):
         self.generic_visit(node)
         self.current_node = old_current
 
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> Any:  # noqa: N802
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> Any:
         """Process async function definitions."""
         is_method = isinstance(node.parent, ast.ClassDef)  # type: ignore[attr-defined]
 
@@ -161,7 +161,7 @@ class SymbolCollector(ast.NodeVisitor):
         returns = f" -> {ast.unparse(node.returns)}" if node.returns else ""
         return f"async def {node.name}({', '.join(args)}){returns}"
 
-    def visit_Name(self, node: ast.Name) -> Any:  # noqa: N802
+    def visit_Name(self, node: ast.Name) -> Any:
         """Process name references."""
         if isinstance(node.ctx, ast.Load):
             # Check if this is a reference to an imported name
@@ -199,7 +199,7 @@ class SymbolCollector(ast.NodeVisitor):
                     )
                 )
 
-    def visit_Call(self, node: ast.Call) -> Any:  # noqa: N802
+    def visit_Call(self, node: ast.Call) -> Any:
         """Process function/class calls."""
         self._add_references_from_expr(node.func)
         for arg in node.args:
@@ -208,7 +208,7 @@ class SymbolCollector(ast.NodeVisitor):
             self._add_references_from_expr(kw.value)
         self.generic_visit(node)
 
-    def visit_Import(self, node: ast.Import) -> Any:  # noqa: N802
+    def visit_Import(self, node: ast.Import) -> Any:
         """Process imports to track references."""
         for alias in node.names:
             asname = alias.asname or alias.name
@@ -223,7 +223,7 @@ class SymbolCollector(ast.NodeVisitor):
                 )
             )
 
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> Any:  # noqa: N802
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> Any:
         """Process from-imports to track references."""
         module = node.module or ""
         for alias in node.names:
@@ -240,7 +240,7 @@ class SymbolCollector(ast.NodeVisitor):
                 )
             )
 
-    def visit_Assign(self, node: ast.Assign) -> Any:  # noqa: N802
+    def visit_Assign(self, node: ast.Assign) -> Any:
         """Process assignments."""
         for target in node.targets:
             if isinstance(target, ast.Name):

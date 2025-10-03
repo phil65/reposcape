@@ -30,7 +30,7 @@ class GraphScorer(ABC):
             return {}
         max_score = max(scores.values())
         if max_score <= 0:
-            return {k: 0.0 for k in scores}
+            return dict.fromkeys(scores, 0.0)
         return {k: v / max_score for k, v in scores.items()}
 
 
@@ -81,7 +81,7 @@ class ReferenceScorer(GraphScorer):
         weights = {k: v for k, v in (weights or {}).items() if k in graph.get_nodes()}
 
         # Initialize scores
-        scores: dict[str, float] = {node: 0.0 for node in graph.get_nodes()}
+        scores: dict[str, float] = dict.fromkeys(graph.get_nodes(), 0.0)
 
         # Add base scores from references
         for node_id in graph.get_nodes():
@@ -112,7 +112,7 @@ class ReferenceScorer(GraphScorer):
     ) -> dict[str, float]:
         """Calculate scores based on distance from important nodes."""
         rx_graph = graph.get_graph()
-        scores: dict[str, float] = {node: 0.0 for node in graph.get_nodes()}
+        scores: dict[str, float] = dict.fromkeys(graph.get_nodes(), 0.0)
 
         # For each important node
         for start_id in important_nodes:
