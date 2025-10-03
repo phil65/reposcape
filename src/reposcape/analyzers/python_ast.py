@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from os import PathLike
     from types import ModuleType
 
+    import upath
+
 
 class SymbolCollector(ast.NodeVisitor):
     """Collect symbols and their references from Python AST."""
@@ -276,7 +278,7 @@ class SymbolCollector(ast.NodeVisitor):
 class PythonAstAnalyzer(CodeAnalyzer):
     """Analyze Python code using the built-in ast module."""
 
-    def can_handle(self, path: str | PathLike[str]) -> bool:
+    def can_handle(self, path: str | PathLike[str] | upath.UPath) -> bool:
         """Check if file is a Python file."""
         return str(path).endswith(".py")
 

@@ -211,7 +211,7 @@ Implement `CodeAnalyzer` for custom file analysis:
 
 ```python
 class CustomAnalyzer(CodeAnalyzer):
-    def can_handle(self, path: str | PathLike[str]) -> bool:
+    def can_handle(self, path: str | PathLike[str] | upath.UPath) -> bool:
         return path.endswith(".custom")
 
     def analyze_file(

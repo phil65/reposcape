@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from os import PathLike
 
+    import upath
+
     from reposcape.models import CodeNode
 
 
@@ -20,7 +22,7 @@ class CodeAnalyzer(ABC):
         return name.startswith("_") and not name.endswith("_")
 
     @abstractmethod
-    def can_handle(self, path: str | PathLike[str]) -> bool:
+    def can_handle(self, path: str | PathLike[str] | upath.UPath) -> bool:
         """Check if this analyzer can handle the given file."""
 
     @abstractmethod

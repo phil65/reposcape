@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 class TextAnalyzer(CodeAnalyzer):
     """Basic analyzer for text files."""
 
-    def can_handle(self, path: str | PathLike[str]) -> bool:
+    def can_handle(self, path: str | PathLike[str] | UPath) -> bool:
         """Check if file is a text file."""
         path = str(path).lower()
         return path.endswith((".txt", ".md", ".rst"))
