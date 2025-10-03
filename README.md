@@ -216,7 +216,7 @@ class CustomAnalyzer(CodeAnalyzer):
 
     def analyze_file(
         self,
-        path: str | PathLike[str],
+        path: str | PathLike[str] | upath.UPath,
         content: str | None = None
     ) -> list[CodeNode]: ...
 ```

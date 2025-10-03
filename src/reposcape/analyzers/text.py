@@ -24,7 +24,7 @@ class TextAnalyzer(CodeAnalyzer):
 
     def analyze_file(
         self,
-        path: str | PathLike[str],
+        path: str | PathLike[str] | UPath,
         content: str | None = None,
     ) -> list[CodeNode]:
         """Analyze a text file."""

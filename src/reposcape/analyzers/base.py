@@ -27,7 +27,7 @@ class CodeAnalyzer(ABC):
 
     @abstractmethod
     def analyze_file(
-        self, path: str | PathLike[str], content: str | None = None
+        self, path: str | PathLike[str] | upath.UPath, content: str | None = None
     ) -> list[CodeNode]:
         """Analyze a single file and return its nodes.
 
