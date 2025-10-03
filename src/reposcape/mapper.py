@@ -240,6 +240,8 @@ class RepoMapper:
         Returns:
             Structured view focused on specified files
         """
+        from upathtools import to_upath
+
         if isinstance(repo_path, ModuleType):
             # If no root_package specified, use repo_path as root
             pkg_name = (root_package or repo_path).__name__
@@ -247,18 +249,12 @@ class RepoMapper:
             # Convert file paths to module paths relative to package
             focused_paths = {f"{pkg_name}.{str(f).replace('/', '.')}" for f in files}
         else:
-            repo_path = UPath(repo_path)
-            focused_paths = {str(UPath(f).relative_to(repo_path)) for f in files}
-            root_node = self._analyze_repository(
-                repo_path,
-                exclude_patterns=exclude_patterns,
-            )
+            path = to_upath(repo_path)
+            focused_paths = {str(UPath(f).relative_to(path)) for f in files}
+            root_node = self._analyze_repository(path, exclude_patterns=exclude_patterns)
 
         # Calculate importance scores with focus
-        self._calculate_importance(
-            root_node,
-            focused_paths=focused_paths,
-        )
+        self._calculate_importance(root_node, focused_paths=focused_paths)
 
         # Generate output
         return self.serializer.serialize(

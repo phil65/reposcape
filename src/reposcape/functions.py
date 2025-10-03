@@ -40,7 +40,7 @@ def _resolve_analyzers(
     for spec in analyzers:
         if isinstance(spec, str):
             analyzer_cls = AVAILABLE_ANALYZERS[spec]
-            result.append(analyzer_cls())
+            result.append(analyzer_cls())  # type: ignore
         elif isinstance(spec, type):
             result.append(spec())
         else:
