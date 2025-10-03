@@ -100,6 +100,7 @@ extend-exclude = ['docs']
 target-version = "py312"
 
 [tool.ruff.lint]
+future-annotations = true
 select = [
     "A", # Flake8-builtins
     # "ANN",  # Flake8-Annotations
@@ -188,16 +189,22 @@ ignore = [
     "D409",    # Section underline should match the length of its name ("{name}")
     "D413",    # Missing blank line after last section ("{name}")
     "ISC001",
+    "PLC0415",
     "PLR0912", # Too many branches
     "PLR0913", # Too many arguments to function call
     "PLR0915", # Too many statements
     # "PLR2004", # Magic values instead of named consts
     "SLF001", # Private member accessed
     "TRY003", # Avoid specifying long messages outside the exception class
+    "TC006", # runtime-cast-value
 ]
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
+
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = ["pydantic.BaseModel", "sqlalchemy.orm.DeclarativeBase", "schemez.Schema"]
+runtime-evaluated-decorators = ["pydantic.validate_call", "attrs.define", "fastapi.FastAPI.get", "fastapi.FastAPI.post", "fastmcp.FastMCP.tool"]
 
 [tool.ruff.format]
 # Enable preview style formatting.
@@ -212,8 +219,14 @@ combine-as-imports = true
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["E402", "I001"]
+"scripts/*" = ["INP001"]
+
+[tool.ty.environment]
+python-version = "3.12"
 
 [tool.pyright]
+venvPath = "."
+venv = ".venv"
 pythonVersion = "3.12"
 pythonPlatform = "All"
 typeCheckingMode = "basic"
