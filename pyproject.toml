@@ -38,6 +38,7 @@ dependencies = [
     # Only add below (Copier)
     "tiktoken>=0.8.0",
     "universal-pathlib>=0.2.5",
+    "upathtools>=0.6.5",
 ]
 
 [tool.uv]
