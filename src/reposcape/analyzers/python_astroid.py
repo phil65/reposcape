@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from typing import TYPE_CHECKING
 
 import astroid
@@ -10,6 +11,8 @@ from reposcape.models.nodes import CodeNode, NodeType, Reference
 
 if TYPE_CHECKING:
     from os import PathLike
+
+    import upath
 
 from .base import CodeAnalyzer
 
@@ -32,7 +35,7 @@ class SymbolCollector:
         for child in node.get_children():
             self.visit(child)
 
-    def visit_ClassDef(self, node: nodes.ClassDef) -> None:
+    def visit_ClassDef(self, node: nodes.ClassDef) -> None:  # noqa: N802
         """Process class definitions."""
         # Add references from bases
         for base in node.bases:
@@ -53,14 +56,15 @@ class SymbolCollector:
         for child in node.get_children():
             self.visit(child)
 
-        class_node = CodeNode(
-            **{**dataclasses.asdict(class_node), "children": self.symbols}
-        )
+        class_node = CodeNode(**{
+            **dataclasses.asdict(class_node),
+            "children": self.symbols,
+        })
 
         self.symbols = old_symbols
         self.symbols[node.name] = class_node
 
-    def visit_FunctionDef(self, node: nodes.FunctionDef) -> None:
+    def visit_FunctionDef(self, node: nodes.FunctionDef) -> None:  # noqa: N802
         """Process function definitions."""
         # astroid provides direct parent access
         is_method = isinstance(node.parent, nodes.ClassDef)
@@ -73,7 +77,7 @@ class SymbolCollector:
             signature=self._get_function_signature(node),
         )
 
-    def visit_Name(self, node: nodes.Name) -> None:
+    def visit_Name(self, node: nodes.Name) -> None:  # noqa: N802
         """Process name references."""
         if node.ctx == "Load":  # Only track usage, not definitions
             self.references.append(
@@ -109,6 +113,7 @@ class SymbolCollector:
         returns = f" -> {node.returns.as_string()}" if node.returns else ""
         return f"def {node.name}({', '.join(args)}){returns}"
 
+
 class PythonAstroidAnalyzer(CodeAnalyzer):
     """Analyze Python code using astroid."""
 
@@ -116,13 +121,13 @@ class PythonAstroidAnalyzer(CodeAnalyzer):
         """Initialize with astroid manager for caching."""
         self.manager = astroid.MANAGER
 
-    def can_handle(self, path: str | PathLike[str]) -> bool:
+    def can_handle(self, path: str | PathLike[str] | upath.UPath) -> bool:
         """Check if file is a Python file."""
         return str(path).endswith(".py")
 
     def analyze_file(
         self,
-        path: str | PathLike[str],
+        path: str | PathLike[str] | upath.UPath,
         content: str | None = None,
     ) -> list[CodeNode]:
         """Analyze a Python file using astroid."""
@@ -138,11 +143,13 @@ class PythonAstroidAnalyzer(CodeAnalyzer):
         collector = SymbolCollector(path_str)
         collector.visit(module)
 
-        return [CodeNode(
-            name=module.name,
-            node_type=NodeType.FILE,
-            path=path_str,
-            content=content or module.file_bytes.decode("utf-8"),
-            children=collector.symbols,
-            references_to=collector.references,
-        )]
+        return [
+            CodeNode(
+                name=module.name,
+                node_type=NodeType.FILE,
+                path=path_str,
+                content=content or module.file_bytes.decode("utf-8"),
+                children=collector.symbols,
+                references_to=collector.references,
+            )
+        ]

@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import libcst as cst
 from libcst.metadata import ParentNodeProvider, PositionProvider
+from upath import UPath
 
 from reposcape.models.nodes import CodeNode, NodeType, Reference
 
 
 if TYPE_CHECKING:
     from os import PathLike
+
+    import upath
 
 from .base import CodeAnalyzer
 
@@ -31,10 +35,10 @@ class SymbolCollector(cst.CSTVisitor):
         self.symbols = {}
         self.references = []
 
-    def visit_ClassDef(self, node: cst.ClassDef) -> bool:
+    def visit_ClassDef(self, node: cst.ClassDef) -> bool:  # noqa: N802
         """Process class definitions."""
         # Get position info
-        pos = self.get_metadata(PositionProvider, node)
+        self.get_metadata(PositionProvider, node)
 
         # Create class node
         class_node = CodeNode(
@@ -65,9 +69,9 @@ class SymbolCollector(cst.CSTVisitor):
 
         return False  # Don't process children again
 
-    def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:
+    def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:  # noqa: N802
         """Process function definitions."""
-        pos = self.get_metadata(PositionProvider, node)
+        self.get_metadata(PositionProvider, node)
 
         # Determine if this is a method
         is_method = any(
@@ -85,7 +89,7 @@ class SymbolCollector(cst.CSTVisitor):
 
         return True  # Process function body for references
 
-    def visit_Name(self, node: cst.Name) -> bool:
+    def visit_Name(self, node: cst.Name) -> bool:  # noqa: N802
         """Process name references."""
         pos = self.get_metadata(PositionProvider, node)
 
@@ -106,10 +110,12 @@ class SymbolCollector(cst.CSTVisitor):
     def _get_docstring(self, node: cst.CSTNode) -> str | None:
         """Extract docstring from node."""
         for child in node.body.body:
-            if isinstance(child, cst.SimpleStatementLine):
-                if isinstance(child.body[0], cst.Expr):
-                    if isinstance(child.body[0].value, cst.SimpleString):
-                        return child.body[0].value.evaluated_value
+            if (
+                isinstance(child, cst.SimpleStatementLine)
+                and isinstance(child.body[0], cst.Expr)
+                and isinstance(child.body[0].value, cst.SimpleString)
+            ):
+                return child.body[0].value.evaluated_value
         return None
 
     def _get_function_signature(self, node: cst.FunctionDef) -> str:
@@ -124,13 +130,13 @@ class SymbolCollector(cst.CSTVisitor):
 class PythonCSTAnalyzer(CodeAnalyzer):
     """Analyze Python code using LibCST."""
 
-    def can_handle(self, path: str | PathLike[str]) -> bool:
+    def can_handle(self, path: str | PathLike[str] | upath.UPath) -> bool:
         """Check if file is a Python file."""
         return str(path).endswith(".py")
 
     def analyze_file(
         self,
-        path: str | PathLike[str],
+        path: str | PathLike[str] | upath.UPath,
         content: str | None = None,
     ) -> list[CodeNode]:
         """Analyze a Python file using LibCST."""

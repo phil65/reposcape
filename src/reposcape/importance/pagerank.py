@@ -72,10 +72,8 @@ class PageRankCalculator(ImportanceCalculator):
                 personalization[path] = personalization.get(path, 1.0) + 1.0
 
         # Calculate PageRank
-        scores = nx.pagerank(
+        return nx.pagerank(
             graph,
             alpha=0.85,  # damping parameter
             personalization=personalization if personalization else None,
         )
-
-        return scores
