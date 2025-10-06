@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from importlib.metadata import version
+
+__version__ = version("reposcape")
+
 from reposcape.mapper import RepoMapper
 from reposcape.models import CodeNode, DetailLevel, NodeType
 from reposcape.analyzers import CodeAnalyzer
@@ -14,9 +18,10 @@ from reposcape.importance import (
 )
 from reposcape.serializers import CodeSerializer
 
-__version__ = "0.1.2"
+
 
 __all__ = [
+    "__version__",
     "CodeAnalyzer",
     "CodeNode",
     "CodeSerializer",
