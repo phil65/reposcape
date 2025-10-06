@@ -19,9 +19,7 @@ from reposcape.importance import (
 from reposcape.serializers import CodeSerializer
 
 
-
 __all__ = [
-    "__version__",
     "CodeAnalyzer",
     "CodeNode",
     "CodeSerializer",
@@ -32,6 +30,7 @@ __all__ = [
     "PageRankScorer",
     "ReferenceScorer",
     "RepoMapper",
+    "__version__",
     "get_focused_view",
     "get_repo_overview",
 ]
