@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
-def sample_repo(tmp_path: Path) -> Generator[Path, None, None]:
+def sample_repo(tmp_path: Path) -> Generator[Path]:
     """Create a temporary repository with sample files."""
     # Create a simple Python package
     pkg_dir = tmp_path / "mypackage"
@@ -82,8 +82,8 @@ def test_get_focused_view(sample_repo: Path) -> None:
     target_file = repo_root / "mypackage" / "utils.py"
 
     result = get_focused_view(
-        files=[target_file],
-        repo_path=repo_root,
+        files=[str(target_file)],
+        repo_path=str(repo_root),
         output_format="compact",
         detail="signatures",
     )
@@ -121,8 +121,8 @@ def main():
     target_file = repo_root / "mypackage" / "app.py"
 
     result = get_focused_view(
-        files=[target_file],
-        repo_path=repo_root,
+        files=[str(target_file)],
+        repo_path=str(repo_root),
         output_format="compact",
         detail="signatures",
     )
