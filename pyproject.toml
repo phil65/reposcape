@@ -1,6 +1,6 @@
 [project]
 name = "reposcape"
-version = "0.2.1"
+version = "1.0.0"
 description = "Repository maps for LLMs"
 readme = "README.md"
 requires-python = ">=3.13"
