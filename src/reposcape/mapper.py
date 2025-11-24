@@ -43,9 +43,7 @@ class RepoMapper:
             scorer: Graph scorer for importance calculation
             serializer: Serializer for output generation
         """
-        self.analyzers = (
-            list(analyzers) if analyzers else [PythonAstAnalyzer(), TextAnalyzer()]
-        )
+        self.analyzers = list(analyzers) if analyzers else [PythonAstAnalyzer(), TextAnalyzer()]
         self.importance_calculator = ImportanceCalculator(scorer or ReferenceScorer())
 
         # Handle serializer string or instance
@@ -324,9 +322,7 @@ class RepoMapper:
 
         return root
 
-    def _add_to_tree(
-        self, root: CodeNode, rel_path: UPath, nodes: list[CodeNode]
-    ) -> None:
+    def _add_to_tree(self, root: CodeNode, rel_path: UPath, nodes: list[CodeNode]) -> None:
         """Add analyzed nodes to the tree structure."""
         current = root
         for part in rel_path.parent.parts:

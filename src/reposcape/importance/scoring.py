@@ -75,9 +75,7 @@ class ReferenceScorer(GraphScorer):
         weights: dict[str, float] | None = None,
     ) -> dict[str, float]:
         """Calculate reference-based scores."""
-        important_nodes = {
-            n for n in (important_nodes or set()) if n in graph.get_nodes()
-        }
+        important_nodes = {n for n in (important_nodes or set()) if n in graph.get_nodes()}
         weights = {k: v for k, v in (weights or {}).items() if k in graph.get_nodes()}
 
         # Initialize scores
@@ -154,8 +152,7 @@ class PageRankScorer(GraphScorer):
         personalization = None
         if important_nodes and weights:
             personalization = {
-                graph.get_node_index(node): weights.get(node, 1.0)
-                for node in important_nodes
+                graph.get_node_index(node): weights.get(node, 1.0) for node in important_nodes
             }
 
         # Calculate PageRank using rustworkx

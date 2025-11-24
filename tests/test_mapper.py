@@ -131,10 +131,7 @@ def test_create_focused_view(temp_repo: Path):
     # Files that aren't part of the dependency chain should be less prominent
     # or not included
     unrelated_files = ["setup.py"]
-    assert all(
-        f not in result or result.find(f) > result.find("main.py")
-        for f in unrelated_files
-    )
+    assert all(f not in result or result.find(f) > result.find("main.py") for f in unrelated_files)
 
 
 def test_exclude_patterns(temp_repo: Path):

@@ -173,9 +173,7 @@ class CodeSerializer(ABC):
                 p.node,
                 p.tokens_needed,
                 p.base_score,
-                p.adjusted_score * 1.5
-                if p.node.path in required_paths
-                else p.adjusted_score,
+                p.adjusted_score * 1.5 if p.node.path in required_paths else p.adjusted_score,
             )
             for p in priorities
         ]
@@ -197,10 +195,7 @@ class CodeSerializer(ABC):
         tokens_used = 0
 
         for priority in sorted_priorities:
-            if (
-                tokens_used + priority.tokens_needed <= token_limit
-                and priority.adjusted_score > 0
-            ):
+            if tokens_used + priority.tokens_needed <= token_limit and priority.adjusted_score > 0:
                 included.add(priority.node.path)
                 tokens_used += priority.tokens_needed
 

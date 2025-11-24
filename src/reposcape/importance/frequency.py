@@ -76,8 +76,7 @@ class FrequencyCalculator(ImportanceCalculator):
 
             # Reference relationship to focused files
             if focused_paths and any(
-                symbol_defs.get(ref.name) in focused_paths
-                for ref in (node.references_to or [])
+                symbol_defs.get(ref.name) in focused_paths for ref in (node.references_to or [])
             ):
                 score += 0.4
 
