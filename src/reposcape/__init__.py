@@ -20,12 +20,7 @@ from reposcape.mapper import RepoMapper
 from reposcape.models import CodeNode, DetailLevel, NodeType
 from reposcape.analyzers import CodeAnalyzer
 from reposcape.functions import get_repo_overview, get_focused_view
-from reposcape.importance import (
-    GraphScorer,
-    ImportanceCalculator,
-    PageRankScorer,
-    ReferenceScorer,
-)
+from reposcape.importance import GraphScorer, ImportanceCalculator, PageRankScorer, ReferenceScorer
 from reposcape.serializers import CodeSerializer
 from reposcape.grep import grep, grep_simple
 from reposcape.repomap import AiderRepoMap
