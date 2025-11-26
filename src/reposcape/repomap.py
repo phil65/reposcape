@@ -14,20 +14,13 @@ import os
 from pathlib import Path
 import random
 import shutil
-import sqlite3
 from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, cast
-
-from diskcache import Cache
-from grep_ast import TreeContext, filename_to_lang
-from grep_ast.tsl import USING_TSL_PACK, get_language, get_parser
-from pygments.lexers import guess_lexer_for_filename
-from pygments.token import Token
-from tree_sitter import Query, QueryCursor
 
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator, Sequence
 
+    from diskcache import Cache
     import networkx as nx
 
 
@@ -75,15 +68,7 @@ class Tag(NamedTuple):
 type RankedTag = Tag | tuple[str]  # Either full Tag or just (filename,)
 
 
-SQLITE_ERRORS: tuple[type[Exception], ...] = (
-    sqlite3.OperationalError,
-    sqlite3.DatabaseError,
-    OSError,
-)
-
-CACHE_VERSION: int = 3
-if USING_TSL_PACK:
-    CACHE_VERSION = 4
+CACHE_VERSION = 4
 
 # Thresholds
 MIN_TOKEN_SAMPLE_SIZE: int = 256
@@ -222,6 +207,10 @@ class RepoMap:
 
     def _tags_cache_error(self, original_error: Exception | None = None) -> None:
         """Handle SQLite errors by trying to recreate cache, falling back to dict."""
+        import sqlite3
+
+        from diskcache import Cache
+
         if isinstance(self.TAGS_CACHE, dict):
             return
 
@@ -240,19 +229,25 @@ class RepoMap:
             del new_cache[test_key]
 
             self.TAGS_CACHE = new_cache
-        except SQLITE_ERRORS:
+        except (sqlite3.OperationalError, sqlite3.DatabaseError, OSError):
             self.TAGS_CACHE = {}  # type: ignore[assignment]
 
     def _load_tags_cache(self) -> None:
         """Load the tags cache from disk."""
+        import sqlite3
+
+        from diskcache import Cache
+
         path = Path(self.root) / self.TAGS_CACHE_DIR
         try:
             self.TAGS_CACHE = Cache(path)
-        except SQLITE_ERRORS as e:
+        except (sqlite3.OperationalError, sqlite3.DatabaseError, OSError) as e:
             self._tags_cache_error(e)
 
     def _get_tags(self, fname: str, rel_fname: str) -> list[Tag]:
         """Get tags for a file, using cache when possible."""
+        import sqlite3
+
         file_mtime = _get_mtime(fname)
         if file_mtime is None:
             return []
@@ -261,14 +256,14 @@ class RepoMap:
         val: dict[str, Any] | None = None
         try:
             val = self.TAGS_CACHE.get(cache_key)  # type: ignore[union-attr]
-        except SQLITE_ERRORS as e:
+        except (sqlite3.OperationalError, sqlite3.DatabaseError, OSError) as e:
             self._tags_cache_error(e)
             val = self.TAGS_CACHE.get(cache_key)  # type: ignore[union-attr]
 
         if val is not None and val.get("mtime") == file_mtime:
             try:
                 return cast(list[Tag], self.TAGS_CACHE[cache_key]["data"])  # type: ignore[index]
-            except SQLITE_ERRORS as e:
+            except (sqlite3.OperationalError, sqlite3.DatabaseError, OSError) as e:
                 self._tags_cache_error(e)
                 return cast(list[Tag], self.TAGS_CACHE[cache_key]["data"])  # type: ignore[index]
 
@@ -277,7 +272,7 @@ class RepoMap:
 
         try:
             self.TAGS_CACHE[cache_key] = {"mtime": file_mtime, "data": data}  # type: ignore[index]
-        except SQLITE_ERRORS as e:
+        except (sqlite3.OperationalError, sqlite3.DatabaseError, OSError) as e:
             self._tags_cache_error(e)
             self.TAGS_CACHE[cache_key] = {"mtime": file_mtime, "data": data}  # type: ignore[index]
 
@@ -285,6 +280,12 @@ class RepoMap:
 
     def _get_tags_raw(self, fname: str, rel_fname: str) -> Iterator[Tag]:  # noqa: PLR0911
         """Extract tags from a file using tree-sitter."""
+        from grep_ast import filename_to_lang
+        from grep_ast.tsl import get_language, get_parser
+        from pygments.lexers import guess_lexer_for_filename
+        from pygments.token import Token
+        from tree_sitter import Query, QueryCursor
+
         lang = filename_to_lang(fname)
         if not lang:
             return
@@ -579,6 +580,8 @@ class RepoMap:
 
     def _render_tree(self, abs_fname: str, rel_fname: str, lois: list[int]) -> str:
         """Render a tree representation of a file with lines of interest."""
+        from grep_ast import TreeContext
+
         mtime = _get_mtime(abs_fname)
         key = (rel_fname, tuple(sorted(lois)), mtime)
 
@@ -673,18 +676,17 @@ def get_random_color() -> str:
 def get_scm_fname(lang: str) -> Path | None:
     """Get the path to the SCM query file for a language."""
     package = __package__ or "reposcape"
-    if USING_TSL_PACK:
-        subdir = "tree-sitter-language-pack"
-        try:
-            path = resources.files(package).joinpath(
-                "queries",
-                subdir,
-                f"{lang}-tags.scm",
-            )
-            if path.is_file():  # type: ignore[union-attr]
-                return Path(str(path))
-        except KeyError:
-            pass
+    subdir = "tree-sitter-language-pack"
+    try:
+        path = resources.files(package).joinpath(
+            "queries",
+            subdir,
+            f"{lang}-tags.scm",
+        )
+        if path.is_file():  # type: ignore[union-attr]
+            return Path(str(path))
+    except KeyError:
+        pass
 
     # Fall back to tree-sitter-languages
     subdir = "tree-sitter-languages"

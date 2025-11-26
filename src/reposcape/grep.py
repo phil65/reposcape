@@ -10,8 +10,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from grep_ast import TreeContext, filename_to_lang
-
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -86,6 +84,8 @@ def _search_file(
     margin: int,
 ) -> SearchMatch | tuple[str, str] | None:
     """Search a single file. Returns SearchMatch, error tuple, or None if no match."""
+    from grep_ast import TreeContext, filename_to_lang
+
     code = _read_file(fname)
     if code is None:
         return (fname, "Failed to read file")
