@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
-import rustworkx as rx
+import networkx as nx
 
 
 if TYPE_CHECKING:
@@ -51,7 +51,7 @@ class ReferenceScorer(GraphScorer):
         outref_weight: float = 0.5,
         important_ref_boost: float = 2.0,
         distance_decay: float = 0.5,
-        focus_boost: float = 5.0,  # Add focus boost parameter
+        focus_boost: float = 5.0,
     ):
         """Initialize scorer with weights.
 
@@ -83,14 +83,12 @@ class ReferenceScorer(GraphScorer):
 
         # Add base scores from references
         for node_id in graph.get_nodes():
-            idx = graph.get_node_index(node_id)
-
             # Incoming references score
-            in_edges = graph.get_graph().in_edges(idx)
+            in_edges = list(graph.in_edges(node_id))
             scores[node_id] += len(in_edges) * self.ref_weight
 
             # Outgoing references score
-            out_edges = graph.get_graph().out_edges(idx)
+            out_edges = list(graph.out_edges(node_id))
             scores[node_id] += len(out_edges) * self.outref_weight
 
         # Apply focus boost to important nodes
@@ -109,37 +107,27 @@ class ReferenceScorer(GraphScorer):
         important_nodes: set[str],
     ) -> dict[str, float]:
         """Calculate scores based on distance from important nodes."""
-        rx_graph = graph.get_graph()
+        nx_graph = graph.get_graph()
         scores: dict[str, float] = dict.fromkeys(graph.get_nodes(), 0.0)
 
         # For each important node
         for start_id in important_nodes:
-            start_idx = graph.get_node_index(start_id)
-
             # Calculate shortest paths to all other nodes
-            # Returns dict[target_idx, list[node_indices]]
-            paths = rx.dijkstra_shortest_paths(rx_graph, start_idx, weight_fn=float)
+            try:
+                paths = nx.single_source_shortest_path_length(nx_graph, start_id)
+            except nx.NetworkXError:
+                continue
 
             # Convert path lengths to scores
-            for node_id in graph.get_nodes():
-                idx = graph.get_node_index(node_id)
-                if idx in paths:
-                    # Use path length (number of nodes - 1) as distance
-                    path = paths[idx]
-                    distance = len(path) - 1
-                    # Score decreases with distance
-                    scores[node_id] += self.distance_decay**distance
+            for node_id, distance in paths.items():
+                # Score decreases with distance
+                scores[node_id] += self.distance_decay**distance
 
         return scores
 
-    def _get_node_id(self, graph: Graph, index: int) -> str:
-        """Get node ID from rustworkx index."""
-        nodes = graph.get_nodes()
-        return next(id_ for id_ in nodes if graph.get_node_index(id_) == index)
-
 
 class PageRankScorer(GraphScorer):
-    """PageRank-based scoring using rustworkx."""
+    """PageRank-based scoring using networkx."""
 
     def score(
         self,
@@ -148,17 +136,20 @@ class PageRankScorer(GraphScorer):
         weights: dict[str, float] | None = None,
     ) -> dict[str, float]:
         """Calculate PageRank scores."""
+        g = graph.get_graph()
+
+        if g.number_of_nodes() == 0:
+            return {}
+
         # Create personalization dict if needed
         personalization = None
         if important_nodes and weights:
-            personalization = {
-                graph.get_node_index(node): weights.get(node, 1.0) for node in important_nodes
-            }
+            personalization = {node: weights.get(node, 1.0) for node in important_nodes}
 
-        # Calculate PageRank using rustworkx
-        g = graph.get_graph()
-        scores = rx.pagerank(g, personalization=personalization)
+        try:
+            scores = nx.pagerank(g, personalization=personalization, dangling=personalization)
+        except nx.PowerIterationFailedConvergence:
+            # Fall back to unweighted pagerank
+            scores = nx.pagerank(g)
 
-        # Map scores back to node IDs
-        nodes = graph.get_nodes()
-        return {node_id: scores[graph.get_node_index(node_id)] for node_id in nodes}
+        return dict(scores)
