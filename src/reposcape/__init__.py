@@ -24,6 +24,12 @@ from reposcape.importance import GraphScorer, ImportanceCalculator, PageRankScor
 from reposcape.serializers import CodeSerializer
 from reposcape.grep import grep, grep_simple
 from reposcape.repomap import AiderRepoMap
+from reposcape.stubgen import (
+    generate_stub_from_file,
+    generate_stub_from_source,
+    generate_stubs_analyzed,
+    generate_stubs_from_directory,
+)
 
 __all__ = [
     "AiderRepoMap",
@@ -38,6 +44,10 @@ __all__ = [
     "ReferenceScorer",
     "RepoMapper",
     "__version__",
+    "generate_stub_from_file",
+    "generate_stub_from_source",
+    "generate_stubs_analyzed",
+    "generate_stubs_from_directory",
     "get_focused_view",
     "get_repo_overview",
     "grep",
