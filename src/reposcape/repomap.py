@@ -100,7 +100,7 @@ def filter_important_files(fnames: list[str]) -> list[str]:
     return [fname for fname in fnames if is_important(fname)]
 
 
-class RepoMap:
+class AiderRepoMap:
     """Generates a map of a repository's code structure using tree-sitter."""
 
     TAGS_CACHE_DIR: ClassVar[str] = f".reposcape.tags.cache.v{CACHE_VERSION}"
@@ -115,7 +115,7 @@ class RepoMap:
         read_file: FileReader | None = None,
         token_counter: TokenCounter | None = None,
     ) -> None:
-        """Initialize RepoMap.
+        """Initialize AiderRepoMap.
 
         Args:
             root: Root directory of the repository.
@@ -725,7 +725,7 @@ if __name__ == "__main__":
     src_dir = project_root / "src" / "reposcape"
     all_py_files = [f for f in find_src_files(src_dir) if f.endswith(".py")]
     print(f"Generating repo map for {len(all_py_files)} Python files...")
-    rm = RepoMap(root=project_root)
+    rm = AiderRepoMap(root=project_root)
     repo_map = rm.get_map(all_py_files)
 
     if repo_map:

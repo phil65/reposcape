@@ -41,6 +41,9 @@ Documentation = "https://phil65.github.io/reposcape/"
 Issues = "https://github.com/phil65/reposcape/issues"
 Source = "https://github.com/phil65/reposcape"
 
+[project.optional-dependencies]
+repomap = ["diskcache>=5.6.3", "grep-ast>=0.9.0", "networkx[default]>=3.6"]
+
 [dependency-groups]
 dev = [
   "devtools",

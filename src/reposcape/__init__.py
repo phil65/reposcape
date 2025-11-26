@@ -28,8 +28,10 @@ from reposcape.importance import (
 )
 from reposcape.serializers import CodeSerializer
 from reposcape.grep import grep, grep_simple
+from reposcape.repomap import AiderRepoMap
 
 __all__ = [
+    "AiderRepoMap",
     "CodeAnalyzer",
     "CodeNode",
     "CodeSerializer",
