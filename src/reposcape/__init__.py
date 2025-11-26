@@ -27,7 +27,7 @@ from reposcape.importance import (
     ReferenceScorer,
 )
 from reposcape.serializers import CodeSerializer
-
+from reposcape.grep import grep, grep_simple
 
 __all__ = [
     "CodeAnalyzer",
@@ -43,4 +43,6 @@ __all__ = [
     "__version__",
     "get_focused_view",
     "get_repo_overview",
+    "grep",
+    "grep_simple",
 ]
