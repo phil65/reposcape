@@ -64,6 +64,7 @@ class Tag(NamedTuple):
     name: str
     kind: str
     end_line: int = -1  # End line for definitions (-1 if unknown)
+    signature_end_line: int = -1  # End line for signature (-1 if unknown)
 
 
 type RankedTag = Tag | tuple[str]  # Either full Tag or just (filename,)
@@ -113,6 +114,7 @@ class AiderRepoMap:
         root: str | Path,
         *,
         max_tokens: int = 1024,
+        max_line_length: int = 250,
         read_file: FileReader | None = None,
         token_counter: TokenCounter | None = None,
     ) -> None:
@@ -121,11 +123,13 @@ class AiderRepoMap:
         Args:
             root: Root directory of the repository.
             max_tokens: Maximum tokens for the generated map.
+            max_line_length: Maximum character length for output lines.
             read_file: Callable to read file contents. Defaults to Path.read_text.
             token_counter: Callable to count tokens. Defaults to len(text) / 4.
         """
         self.root = str(root)
         self.max_tokens = max_tokens
+        self.max_line_length = max_line_length
         self._read_file = read_file or self._default_read_file
         self._token_counter = token_counter
 
@@ -329,8 +333,17 @@ class AiderRepoMap:
             line = node.start_point[0]
             # For definitions, get the end line from the parent node (the full definition)
             end_line = -1
+            signature_end_line = -1
             if kind == "def" and node.parent is not None:
                 end_line = node.parent.end_point[0]
+                # Find signature end by looking for block/body child
+                for child in node.parent.children:
+                    if child.type in ("block", "body", "compound_statement"):
+                        # Signature ends on line before block starts
+                        signature_end_line = child.start_point[0] - 1
+                        break
+                # Fallback: use parent's start line if no block found
+                signature_end_line = max(signature_end_line, line)
             yield Tag(
                 rel_fname=rel_fname,
                 fname=fname,
@@ -338,6 +351,7 @@ class AiderRepoMap:
                 kind=kind,
                 line=line,
                 end_line=end_line,
+                signature_end_line=signature_end_line,
             )
 
         if "ref" in saw:
@@ -686,12 +700,16 @@ class AiderRepoMap:
                 cur_fname = this_rel_fname
 
             if lois is not None and line_ranges is not None and isinstance(tag, Tag):
-                lois.append(tag.line)
+                # Add all lines from start to signature end as lines of interest
+                if tag.signature_end_line >= tag.line:
+                    lois.extend(range(tag.line, tag.signature_end_line + 1))
+                else:
+                    lois.append(tag.line)
                 if tag.end_line >= 0:
                     line_ranges[tag.line] = tag.end_line
 
         # Truncate long lines
-        return "\n".join([line[:100] for line in output.splitlines()]) + "\n"
+        return "\n".join([line[: self.max_line_length] for line in output.splitlines()]) + "\n"
 
 
 def find_src_files(directory: str | Path) -> list[str]:
@@ -759,7 +777,7 @@ if __name__ == "__main__":
 
     def get_map(folder):
         all_py_files = [f for f in find_src_files(src_dir) if f.endswith(".py")]
-        rm = AiderRepoMap(root=project_root, max_tokens=10000)
+        rm = AiderRepoMap(root=project_root, max_tokens=1000000)
         return rm.get_map(all_py_files)
 
     repo_map = get_map(src_dir)
