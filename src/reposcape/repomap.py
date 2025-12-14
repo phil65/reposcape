@@ -63,6 +63,7 @@ class Tag(NamedTuple):
     line: int
     name: str
     kind: str
+    end_line: int = -1  # End line for definitions (-1 if unknown)
 
 
 type RankedTag = Tag | tuple[str]  # Either full Tag or just (filename,)
@@ -324,13 +325,19 @@ class AiderRepoMap:
                 continue
 
             saw.add(kind)
-
+            name = node.text.decode("utf-8")
+            line = node.start_point[0]
+            # For definitions, get the end line from the parent node (the full definition)
+            end_line = -1
+            if kind == "def" and node.parent is not None:
+                end_line = node.parent.end_point[0]
             yield Tag(
                 rel_fname=rel_fname,
                 fname=fname,
-                name=node.text.decode("utf-8"),
+                name=name,
                 kind=kind,
-                line=node.start_point[0],
+                line=line,
+                end_line=end_line,
             )
 
         if "ref" in saw:
@@ -346,15 +353,8 @@ class AiderRepoMap:
 
         tokens = list(lexer.get_tokens(code))
         name_tokens = [token[1] for token in tokens if token[0] in Token.Name]
-
         for token in name_tokens:
-            yield Tag(
-                rel_fname=rel_fname,
-                fname=fname,
-                name=token,
-                kind="ref",
-                line=-1,
-            )
+            yield Tag(rel_fname=rel_fname, fname=fname, name=token, kind="ref", line=-1)
 
     def _get_ranked_tags(
         self,
@@ -553,9 +553,29 @@ class AiderRepoMap:
 
         return best_tree
 
-    def _render_tree(self, abs_fname: str, rel_fname: str, lois: list[int]) -> str:
-        """Render a tree representation of a file with lines of interest."""
+    def _render_tree(
+        self,
+        abs_fname: str,
+        rel_fname: str,
+        lois: list[int],
+        line_ranges: dict[int, int] | None = None,
+    ) -> str:
+        """Render a tree representation of a file with lines of interest.
+
+        The output includes 1-based line number ranges for definitions.
+
+        Args:
+            abs_fname: Absolute path to the file.
+            rel_fname: Relative path to the file.
+            lois: List of lines of interest (0-indexed).
+            line_ranges: Optional dict mapping start line to end line (0-indexed).
+        """
+        import re
+
         from grep_ast import TreeContext
+
+        if line_ranges is None:
+            line_ranges = {}
 
         mtime = _get_mtime(abs_fname)
         key = (rel_fname, tuple(sorted(lois)), mtime)
@@ -570,8 +590,6 @@ class AiderRepoMap:
             context = TreeContext(
                 rel_fname,
                 code,
-                color=False,
-                line_number=False,
                 child_context=False,
                 last_line=False,
                 margin=0,
@@ -586,6 +604,51 @@ class AiderRepoMap:
         context.add_lines_of_interest(lois)
         context.add_context()
         res: str = context.format()
+
+        # Add line numbers/ranges to class/function/method definitions
+        code = self._read_file(abs_fname) or ""
+        code_lines = code.splitlines()
+        lois_set = set(lois)
+
+        # Pattern to match class/function definitions
+        def_pattern = re.compile(r"^(.*?)(class\s+\w+|def\s+\w+|async\s+def\s+\w+)")
+
+        result_lines = []
+        for output_line in res.splitlines():
+            modified_line = output_line
+            # Check if this line contains a class or function definition
+            match = def_pattern.search(output_line)
+            if match:
+                # Find matching line number from lois
+                # Strip leading markers (│, etc.) to get the actual code
+                stripped = output_line.lstrip("│ \t")
+                for line_num in lois_set:
+                    if line_num < len(code_lines):
+                        orig_line = code_lines[line_num].strip()
+                        if orig_line and stripped.startswith(orig_line.split("(")[0].split(":")[0]):
+                            # Find the name part and add line range at end of line
+                            name_match = re.search(
+                                r"(class\s+\w+|def\s+\w+|async\s+def\s+\w+)", output_line
+                            )
+                            if name_match:
+                                # line_num is 0-indexed, display as 1-indexed
+                                start_line_display = line_num + 1
+                                end_line = line_ranges.get(line_num, -1)
+                                if end_line >= 0 and end_line != line_num:
+                                    # Display as range
+                                    end_line_display = end_line + 1
+                                    line_info = f"  # [{start_line_display}-{end_line_display}]"
+                                else:
+                                    # Single line or unknown end
+                                    line_info = f"  # [{start_line_display}]"
+                                # Append line info at the end of the line
+                                modified_line = f"{output_line}{line_info}"
+                            break
+            result_lines.append(modified_line)
+
+        res = "\n".join(result_lines)
+        if result_lines:
+            res += "\n"
         self.tree_cache[key] = res
         return res
 
@@ -597,6 +660,7 @@ class AiderRepoMap:
         cur_fname: str | None = None
         cur_abs_fname: str | None = None
         lois: list[int] | None = None
+        line_ranges: dict[int, int] | None = None
         output = ""
 
         # Add bogus tag to trigger final output
@@ -610,17 +674,21 @@ class AiderRepoMap:
                 if lois is not None and cur_fname and cur_abs_fname:
                     output += "\n"
                     output += cur_fname + ":\n"
-                    output += self._render_tree(cur_abs_fname, cur_fname, lois)
+                    output += self._render_tree(cur_abs_fname, cur_fname, lois, line_ranges)
                     lois = None
+                    line_ranges = None
                 elif cur_fname:
                     output += "\n" + cur_fname + "\n"
                 if isinstance(tag, Tag):
                     lois = []
+                    line_ranges = {}
                     cur_abs_fname = tag.fname
                 cur_fname = this_rel_fname
 
-            if lois is not None and isinstance(tag, Tag):
+            if lois is not None and line_ranges is not None and isinstance(tag, Tag):
                 lois.append(tag.line)
+                if tag.end_line >= 0:
+                    line_ranges[tag.line] = tag.end_line
 
         # Truncate long lines
         return "\n".join([line[:100] for line in output.splitlines()]) + "\n"
@@ -651,11 +719,7 @@ def get_scm_fname(lang: str) -> Path | None:
     package = __package__ or "reposcape"
     subdir = "tree-sitter-language-pack"
     try:
-        path = resources.files(package).joinpath(
-            "queries",
-            subdir,
-            f"{lang}-tags.scm",
-        )
+        path = resources.files(package).joinpath("queries", subdir, f"{lang}-tags.scm")
         if path.is_file():  # type: ignore[union-attr]
             return Path(str(path))
     except KeyError:
@@ -664,11 +728,7 @@ def get_scm_fname(lang: str) -> Path | None:
     # Fall back to tree-sitter-languages
     subdir = "tree-sitter-languages"
     try:
-        path = resources.files(package).joinpath(
-            "queries",
-            subdir,
-            f"{lang}-tags.scm",
-        )
+        path = resources.files(package).joinpath("queries", subdir, f"{lang}-tags.scm")
         return Path(str(path))
     except KeyError:
         return None
@@ -696,13 +756,11 @@ if __name__ == "__main__":
     # Quick test: generate repo map for project itself
     project_root = Path(__file__).parent.parent.parent
     src_dir = project_root / "src" / "reposcape"
-    all_py_files = [f for f in find_src_files(src_dir) if f.endswith(".py")]
-    print(f"Generating repo map for {len(all_py_files)} Python files...")
-    rm = AiderRepoMap(root=project_root)
-    repo_map = rm.get_map(all_py_files)
 
-    if repo_map:
-        print(f"Repo map ({len(repo_map)} chars):\n")
-        print(repo_map)
-    else:
-        print("No repo map generated")
+    def get_map(folder):
+        all_py_files = [f for f in find_src_files(src_dir) if f.endswith(".py")]
+        rm = AiderRepoMap(root=project_root, max_tokens=10000)
+        return rm.get_map(all_py_files)
+
+    repo_map = get_map(src_dir)
+    print(repo_map)
