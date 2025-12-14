@@ -49,7 +49,7 @@ def generate_stub_from_source(
     Returns:
         The generated stub content as a string
     """
-    mypy, ASTStubGenerator = _get_mypy_imports()
+    mypy, ASTStubGenerator = _get_mypy_imports()  # noqa: N806
 
     options = mypy.options.Options()
     options.python_version = (3, 13)
@@ -233,7 +233,7 @@ def generate_stubs_analyzed(
         generate_asts_for_modules(py_modules, options.parse_only, mypy_opts, options.verbose)
 
         results: dict[str, str] = {}
-        all_module_names = sorted(m.module for m in py_modules + pyc_modules + c_modules)
+        _all_module_names = sorted(m.module for m in py_modules + pyc_modules + c_modules)
 
         for mod in py_modules + pyc_modules:
             if mod.ast is None:

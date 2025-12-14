@@ -70,7 +70,7 @@ class SearchResult:
 def _read_file(path: str) -> str | None:
     """Read file contents, returning None on error."""
     try:
-        return Path(path).read_text()
+        return Path(path).read_text("utf-8")
     except (OSError, UnicodeDecodeError):
         return None
 

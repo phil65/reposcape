@@ -141,7 +141,7 @@ class AiderRepoMap:
     def _default_read_file(fname: str) -> str | None:
         """Default file reader using Path.read_text."""
         try:
-            return Path(fname).read_text()
+            return Path(fname).read_text("utf-8")
         except (OSError, UnicodeDecodeError):
             return None
 
@@ -299,7 +299,7 @@ class AiderRepoMap:
         query_scm = get_scm_fname(lang)
         if not query_scm or not query_scm.exists():
             return
-        query_scm_text = query_scm.read_text()
+        query_scm_text = query_scm.read_text("utf-8")
 
         code = self._read_file(fname)
         if not code:
@@ -369,38 +369,28 @@ class AiderRepoMap:
         defines: defaultdict[str, set[str]] = defaultdict(set)
         references: defaultdict[str, list[str]] = defaultdict(list)
         definitions: defaultdict[tuple[str, str], set[Tag]] = defaultdict(set)
-
         personalization: dict[str, float] = {}
-
         exclude_rel_fnames: set[str] = set()
         sorted_fnames = sorted(files)
-
         # Default personalization for unspecified files
         personalize = 100 / len(sorted_fnames) if sorted_fnames else 0
-
         fnames_iter: Iterable[str] = sorted_fnames
-
         for fname in fnames_iter:
             try:
                 file_ok = Path(fname).is_file()
             except OSError:
                 file_ok = False
-
             if not file_ok:
                 if fname not in self.warned_files:
                     self.warned_files.add(fname)
                 continue
-
             rel_fname = self.get_rel_fname(fname)
             current_pers = 0.0
-
             if fname in exclude:
                 current_pers += personalize
                 exclude_rel_fnames.add(rel_fname)
-
             if rel_fname in boost_files:
                 current_pers = max(current_pers, personalize)
-
             # Check path components against boost_idents
             path_obj = Path(rel_fname)
             path_components = set(path_obj.parts)
@@ -414,9 +404,7 @@ class AiderRepoMap:
 
             if current_pers > 0:
                 personalization[rel_fname] = current_pers
-
             tags = list(self._get_tags(fname, rel_fname))
-
             for tag in tags:
                 if tag.kind == "def":
                     defines[tag.name].add(rel_fname)
@@ -429,9 +417,7 @@ class AiderRepoMap:
             references = defaultdict(list, {k: list(v) for k, v in defines.items()})
 
         idents = set(defines.keys()).intersection(set(references.keys()))
-
         graph: nx.MultiDiGraph = nx.MultiDiGraph()
-
         # Add self-edges for definitions without references
         for ident in defines:
             if ident in references:
@@ -441,9 +427,7 @@ class AiderRepoMap:
 
         for ident in idents:
             definers = defines[ident]
-
             mul = 1.0
-
             is_snake = ("_" in ident) and any(c.isalpha() for c in ident)
             is_kebab = ("-" in ident) and any(c.isalpha() for c in ident)
             is_camel = any(c.isupper() for c in ident) and any(c.islower() for c in ident)
@@ -461,10 +445,8 @@ class AiderRepoMap:
                     use_mul = mul
                     if referencer in exclude_rel_fnames:
                         use_mul *= 50
-
                     # Scale down high frequency mentions
                     scaled_refs = math.sqrt(num_refs)
-
                     graph.add_edge(referencer, definer, weight=use_mul * scaled_refs, ident=ident)
 
         pers_args: dict[str, Any] = {}
@@ -542,30 +524,23 @@ class AiderRepoMap:
         ranked_tags_fnames = {tag[0] for tag in ranked_tags}
         special_fnames = [fn for fn in special_fnames if fn not in ranked_tags_fnames]
         special_tags: list[RankedTag] = [(fn,) for fn in special_fnames]
-
         ranked_tags = special_tags + ranked_tags
-
         num_tags = len(ranked_tags)
         lower_bound = 0
         upper_bound = num_tags
         best_tree: str | None = None
         best_tree_tokens: float = 0
-
         exclude_rel_fnames = {self.get_rel_fname(fname) for fname in exclude}
-
         self.tree_cache = {}
-
         middle = min(int(max_tokens // 25), num_tags)
         while lower_bound <= upper_bound:
             tree = self._to_tree(ranked_tags[:middle], exclude_rel_fnames)
             num_tokens = self.token_count(tree)
-
             pct_err = abs(num_tokens - max_tokens) / max_tokens if max_tokens else 0
             ok_err = 0.15
             if (num_tokens <= max_tokens and num_tokens > best_tree_tokens) or pct_err < ok_err:
                 best_tree = tree
                 best_tree_tokens = num_tokens
-
                 if pct_err < ok_err:
                     break
 
@@ -584,10 +559,8 @@ class AiderRepoMap:
 
         mtime = _get_mtime(abs_fname)
         key = (rel_fname, tuple(sorted(lois)), mtime)
-
         if key in self.tree_cache:
             return self.tree_cache[key]
-
         cached = self.tree_context_cache.get(rel_fname)
         if cached is None or cached["mtime"] != mtime:
             code = self._read_file(abs_fname) or ""
