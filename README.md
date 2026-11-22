@@ -24,9 +24,10 @@
 
 [Read the documentation!](https://phil65.github.io/reposcape/)
 
-# RepoScape
-
-RepoScape is a Python library for mapping and analyzing repository structures with a focus on understanding code dependencies and importance. It parses code files, builds a graph representation, and helps identify important components through various scoring algorithms.
+RepoScape builds compact, importance-ranked maps of a code base for use as LLM context.
+It parses a repository (or an imported Python package), builds a reference graph between
+symbols, scores every element and serializes the most relevant parts as Markdown, a compact
+outline or an ASCII tree, optionally within a token budget.
 
 ## Installation
 
@@ -34,253 +35,136 @@ RepoScape is a Python library for mapping and analyzing repository structures wi
 pip install reposcape
 ```
 
-Requires Python 3.12 or higher.
+Requires Python 3.13 or newer. Optional extras: `reposcape[stubgen]` (mypy, for stub
+generation), `reposcape[astroid]` and `reposcape[libcst]` (experimental analyzers).
 
-## Quick Start
+## Quick start
 
 ```python
-from reposcape import RepoMapper, DetailLevel
+from reposcape import get_focused_view, get_repo_overview
 
-# Create mapper with default settings
-mapper = RepoMapper()
+# Overview of a repository as an ASCII tree
+print(get_repo_overview("path/to/repo", output_format="tree", detail="structure"))
 
-# Generate overview of entire repository
-overview = mapper.create_overview(
-    repo_path="path/to/repo",
-    detail=DetailLevel.SIGNATURES,
-    token_limit=2000,  # Optional token limit for output
-)
+# Signatures of the most important elements, limited to ~2000 tokens
+print(get_repo_overview("path/to/repo", detail="signatures", token_limit=2000))
 
-# Generate focused view of specific files
-focused = mapper.create_focused_view(
-    files=["main.py", "utils.py"], repo_path="path/to/repo", detail=DetailLevel.DOCSTRINGS
-)
+# Focus on some files and what they reference
+print(get_focused_view(["src/core.py"], "path/to/repo", detail="docstrings"))
 ```
 
-## Core Components
-
-### RepoMapper
-
-The main entry point for repository analysis. Configurable with custom analyzers, scorers, and serializers.
+`repo_path` can also be an imported module or package, which is analyzed via its source:
 
 ```python
-class RepoMapper:
-    def __init__(
-        self,
-        *,
-        analyzers: Sequence[CodeAnalyzer] | None = None,
-        scorer: GraphScorer | None = None,
-        serializer: CodeSerializer | None = None,
-    ): ...
+import json
 
-    def create_overview(
-        self,
-        repo_path: str | PathLike[str],
-        *,
-        token_limit: int | None = None,
-        detail: DetailLevel = DetailLevel.SIGNATURES,
-        exclude_patterns: list[str] | None = None,
-    ) -> str: ...
+from reposcape import get_repo_overview
 
-    def create_focused_view(
-        self,
-        files: Sequence[str | PathLike[str]],
-        repo_path: str | PathLike[str],
-        *,
-        token_limit: int | None = None,
-        detail: DetailLevel = DetailLevel.SIGNATURES,
-        exclude_patterns: list[str] | None = None,
-    ) -> str: ...
+print(get_repo_overview(json, output_format="compact"))
 ```
 
-### Detail Levels
+## Features
 
-Control how much information is included in the output:
+- **Analyzers**: `PythonAstAnalyzer` (classes, functions, methods, variables, references,
+  signatures, docstrings) and `TextAnalyzer` (`.txt`, `.md`, `.rst`; Markdown sections).
+- **Importance scoring**: `ReferenceScorer` (incoming/outgoing references, proximity to
+  focused files; default) and `PageRankScorer` (networkx PageRank).
+- **Serializers**: `"markdown"`, `"compact"` and `"tree"` output formats.
+- **Detail levels**: `structure`, `signatures`, `docstrings`, `full`.
+- **Privacy modes**: `"public_only"`, `"all"` or `"smart"` (private members only when documented,
+  important or referenced from public code).
+- **Aider-style repo map**: `AiderRepoMap` uses tree-sitter tag queries for many languages and
+  ranks definitions with PageRank.
+- **AST-aware grep**: `grep()` / `grep_simple()` show matches with their enclosing scopes.
+- **Stub generation**: `generate_stub_from_source()` and friends wrap mypy's stubgen.
+- Paths go through [universal-pathlib](https://github.com/fsspec/universal_pathlib), so
+  fsspec file systems work too.
 
-```python
-class DetailLevel(Enum):
-    STRUCTURE  # Just names and hierarchy
-    SIGNATURES  # Include function/class signatures
-    DOCSTRINGS  # Include signatures + docstrings
-    FULL_CODE  # Include complete implementations
-```
-
-## Code Analysis
-
-RepoScape includes analyzers for different file types:
-
-### PythonAstAnalyzer
-
-Analyzes Python files using AST parsing:
-- Extracts classes, functions, methods, variables
-- Tracks references between symbols
-- Collects docstrings and signatures
+## Using `RepoMapper` directly
 
 ```python
-analyzer = PythonAstAnalyzer()
-nodes = analyzer.analyze_file("main.py")
-```
-
-### TextAnalyzer
-
-Basic analyzer for text files:
-- Handles .txt, .md, .rst files
-- Extracts sections from markdown files
-- Preserves file content and first paragraph as docstring
-
-## Importance Scoring
-
-RepoScape offers different algorithms for calculating code importance:
-
-### ReferenceScorer
-
-Simple reference-based scoring that considers:
-- Number of incoming references (highest weight)
-- Number of outgoing references (medium weight)
-- Being referenced by important files (high boost)
-- Distance from important files (decreasing boost)
-
-```python
-from reposcape.importance import ReferenceScorer
-
-scorer = ReferenceScorer(
-    ref_weight=1.0,
-    outref_weight=0.5,
-    important_ref_boost=2.0,
-    distance_decay=0.5,
-)
-```
-
-### PageRankScorer
-
-Uses the PageRank algorithm to score nodes based on the graph structure:
-- Considers connection patterns
-- Handles cycles in dependencies
-- Supports personalization for focused analysis
-
-```python
+from reposcape import DetailLevel, RepoMapper
 from reposcape.importance import PageRankScorer
 
-scorer = PageRankScorer()
-```
+mapper = RepoMapper(scorer=PageRankScorer(), serializer="compact")
 
-## Output Serialization
+overview = mapper.create_overview(
+    "path/to/repo",
+    detail=DetailLevel.SIGNATURES,
+    exclude_patterns=["**/__pycache__/*", "**/tests/*"],
+    privacy="public_only",
+)
 
-Multiple serializers are available for different output formats:
-
-### MarkdownSerializer
-
-Generates detailed markdown with:
-- Hierarchical structure using headers
-- Code blocks for signatures/implementations
-- Emojis for different node types
-- Optional details based on importance scores
-
-### CompactSerializer
-
-Produces a compact, indented format:
-- Single line per node
-- Indentation shows hierarchy
-- Abbreviated signatures
-- Good for quick overviews
-
-### TreeSerializer
-
-ASCII tree-style output:
-- Uses box-drawing characters
-- Shows clear parent-child relationships
-- Similar to `tree` command output
-
-Example usage:
-
-```python
-from reposcape.serializers import MarkdownSerializer, CompactSerializer, TreeSerializer
-
-# Create mapper with specific serializer
-mapper = RepoMapper(serializer=TreeSerializer())
-```
-
-## Advanced Usage
-
-### Custom Analyzers
-
-Implement `CodeAnalyzer` for custom file analysis:
-
-```python
-class CustomAnalyzer(CodeAnalyzer):
-    def can_handle(self, path: str | PathLike[str] | upath.UPath) -> bool:
-        return path.endswith(".custom")
-
-    def analyze_file(
-        self, path: str | PathLike[str] | upath.UPath, content: str | None = None
-    ) -> list[CodeNode]: ...
-```
-
-### Focused Analysis
-
-Analyze specific files and their relationships:
-
-```python
-mapper = RepoMapper()
-
-# Focus on specific files
-focused_view = mapper.create_focused_view(
-    files=["src/core.py", "src/utils.py"],
-    repo_path=".",
+focused = mapper.create_focused_view(
+    ["src/core.py", "src/utils.py"],
+    "path/to/repo",
     detail=DetailLevel.DOCSTRINGS,
-    exclude_patterns=["**/test_*.py", "**/__pycache__/*"],
 )
 ```
 
-### Token Limits
-
-Control output size for large repositories:
+`analyzers`, `scorer` and `serializer` accept instances, so custom implementations of
+`CodeAnalyzer`, `GraphScorer` and `CodeSerializer` can be plugged in:
 
 ```python
-# Limit output to approximately 2000 tokens
-overview = mapper.create_overview(repo_path=".", token_limit=2000, detail=DetailLevel.SIGNATURES)
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from reposcape import CodeAnalyzer, CodeNode, NodeType, RepoMapper
+from reposcape.analyzers import PythonAstAnalyzer
+from upath import UPath
+
+
+if TYPE_CHECKING:
+    from os import PathLike
+
+
+class IniAnalyzer(CodeAnalyzer):
+    def can_handle(self, path: str | PathLike[str] | UPath) -> bool:
+        return str(path).endswith(".ini")
+
+    def analyze_file(
+        self, path: str | PathLike[str] | UPath, content: str | None = None
+    ) -> list[CodeNode]:
+        path = UPath(path)
+        text = content if content is not None else path.read_text()
+        return [CodeNode(name=path.name, node_type=NodeType.FILE, path=str(path), content=text)]
+
+
+mapper = RepoMapper(analyzers=[PythonAstAnalyzer(), IniAnalyzer()])
 ```
 
-## Models
-
-### CodeNode
-
-Immutable representation of code elements:
+## Aider-style repo map
 
 ```python
-@dataclass(frozen=True)
-class CodeNode:
-    name: str
-    node_type: NodeType
-    path: str
-    content: str | None = None
-    docstring: str | None = None
-    signature: str | None = None
-    children: Mapping[str, CodeNode] | None = None
-    references_to: Sequence[Reference] | None = None
-    referenced_by: Sequence[Reference] | None = None
-    importance: float = 0.0
+from reposcape import AiderRepoMap
+from reposcape.repomap import find_src_files
+
+files = find_src_files("path/to/repo")
+repo_map = AiderRepoMap("path/to/repo", max_tokens=1024)
+print(repo_map.get_map(files, boost_files={"path/to/repo/src/core.py"}))
 ```
 
-### NodeType
-
-Available node types:
-- DIRECTORY
-- FILE
-- CLASS
-- FUNCTION
-- METHOD
-- VARIABLE
-
-### Reference
-
-Tracks symbol references:
+## AST-aware grep
 
 ```python
-@dataclass(frozen=True)
-class Reference:
-    name: str
-    path: str
-    line: int
-    column: int
+from reposcape import grep, grep_simple
+from reposcape.repomap import find_src_files
+
+files = find_src_files("src")
+print(grep_simple(files, r"class \w+Scorer"))
+
+result = grep(files, r"def score", ignore_case=True, margin=2)
+print(result.total_matches, result.files_matched)
+```
+
+## Stub generation
+
+Requires `reposcape[stubgen]`.
+
+```python
+from reposcape import generate_stub_from_source, generate_stubs_from_directory
+
+print(generate_stub_from_source("def f(x: int) -> str:\n    return str(x)\n"))
+stubs = generate_stubs_from_directory("src/mypackage")  # {"relative/path.pyi": "..."}
 ```
