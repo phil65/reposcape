@@ -39,9 +39,10 @@ class RepoMapper:
         """Initialize RepoMapper.
 
         Args:
-            analyzers: Code analyzers to use, defaults to [PythonAstAnalyzer]
-            scorer: Graph scorer for importance calculation
-            serializer: Serializer for output generation
+            analyzers: Code analyzers to use,
+                defaults to [PythonAstAnalyzer(), TextAnalyzer()]
+            scorer: Graph scorer for importance calculation, defaults to ReferenceScorer
+            serializer: Serializer instance or format name ("markdown", "compact", "tree")
         """
         self.analyzers = list(analyzers) if analyzers else [PythonAstAnalyzer(), TextAnalyzer()]
         self.importance_calculator = ImportanceCalculator(scorer or ReferenceScorer())

@@ -104,7 +104,7 @@ def get_repo_overview(
 
     Example:
         >>> # Using default analyzers
-        >>> print(get_repo_overview(".", format="tree"))
+        >>> print(get_repo_overview(".", output_format="tree"))
 
         >>> # Using specific analyzers
         >>> print(get_repo_overview(".", analyzers=["python"]))
@@ -112,8 +112,9 @@ def get_repo_overview(
         >>> # Using custom analyzer
         >>> print(get_repo_overview(".", analyzers=[MyAnalyzer()]))
 
-        >>> # Analyzing a package
-        >>> print(get_repo_overview("requests", root_package="requests"))
+        >>> # Analyzing an imported package
+        >>> import json
+        >>> print(get_repo_overview(json))
     """
     mapper = RepoMapper(
         analyzers=_resolve_analyzers(analyzers),
@@ -185,9 +186,9 @@ def get_focused_view(
         >>> # Using specific scorer
         >>> print(get_focused_view(files, ".", scorer="pagerank"))
 
-        >>> # Analyzing module files
-        >>> print(get_focused_view(["client.py"], "requests",
-        ...       root_package="requests"))
+        >>> # Analyzing an imported package
+        >>> import json
+        >>> print(get_focused_view(["decoder.py"], json, root_package="json"))
     """
     mapper = RepoMapper(
         analyzers=_resolve_analyzers(analyzers),
