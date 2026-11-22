@@ -8,6 +8,7 @@ Requires mypy to be installed: `pip install mypy`
 
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 import tempfile
 from typing import TYPE_CHECKING
@@ -56,12 +57,16 @@ def generate_stub_from_source(
     options.include_docstrings = include_docstrings
 
     errors = mypy.errors.Errors(options)
+    # mypy >= 2 parses lazily unless asked to build the AST eagerly.
+    parse_params = inspect.signature(mypy.parse.parse).parameters
+    parse_kwargs = {"eager": True} if "eager" in parse_params else {}
     ast = mypy.parse.parse(
         source,
         fnam="<string>",
         module=module_name,
         errors=errors,
         options=options,
+        **parse_kwargs,
     )
     ast._fullname = module_name
 
