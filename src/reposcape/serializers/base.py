@@ -48,10 +48,32 @@ class CodeSerializer(ABC):
         if token_limit:
             # Select nodes to include within token budget
             included = self._select_nodes(priorities, token_limit)
+            included |= self._ancestor_paths(root, included)
             return self._serialize_filtered(root, included, detail)
 
         # No limit - serialize based on privacy mode
         return self._serialize_node(root, detail=detail, privacy=privacy)
+
+    @staticmethod
+    def _ancestor_paths(root: CodeNode, included: set[str]) -> set[str]:
+        """Get paths of all nodes that contain an included node.
+
+        Without them, selected nodes would be unreachable when serializing the tree
+        (e.g. the root directory usually has no importance score of its own).
+        """
+        ancestors: set[str] = set()
+
+        def visit(node: CodeNode) -> bool:
+            contains = False
+            for child in (node.children or {}).values():
+                if visit(child):
+                    contains = True
+            if contains:
+                ancestors.add(node.path)
+            return contains or node.path in included
+
+        visit(root)
+        return ancestors
 
     def _estimate_tokens(self, text: str) -> int:
         """Estimate tokens in text."""
