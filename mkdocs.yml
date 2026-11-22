@@ -1,5 +1,5 @@
 site_name: "RepoScape"
-site_description: "Repository maps for LLMs"
+site_description: "Importance-ranked repository maps and code overviews for LLM context"
 repo_url: "https://github.com/phil65/reposcape/"
 site_url: https://phil65.github.io/reposcape/
 site_author: "Philipp Temminghoff"

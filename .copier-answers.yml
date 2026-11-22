@@ -9,7 +9,7 @@ copyright_holder: Philipp Temminghoff
 copyright_holder_email: philipptemminghoff@googlemail.com
 libraries_use_pydantic: false
 libraries_use_qt: false
-project_description: Repository maps for LLMs
+project_description: Importance-ranked repository maps and code overviews for LLM context
 project_name: RepoScape
 python_minimum_version: '3.13'
 python_package_command_line_name: reposcape
