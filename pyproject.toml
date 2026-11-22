@@ -2,7 +2,7 @@
 
 [project]
 name = "reposcape"
-version = "1.0.2"
+version = "1.1.0"
 description = "Importance-ranked repository maps and code overviews for LLM context"
 readme = "README.md"
 requires-python = ">=3.13"
