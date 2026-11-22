@@ -58,10 +58,7 @@ class SymbolCollector(cst.CSTVisitor):
         self.generic_visit(node)
 
         # Update class with its methods
-        class_node = CodeNode(**{
-            **dataclasses.asdict(class_node),
-            "children": self.symbols,
-        })
+        class_node = dataclasses.replace(class_node, children=self.symbols)
 
         # Restore old symbols and add class
         self.symbols = old_symbols

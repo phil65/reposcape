@@ -66,8 +66,9 @@ def test_graph_node_uniqueness():
     # Should only have one node
     assert len(graph.get_nodes()) == 1
 
-    # Index should be valid in underlying graph
-    assert graph.graph._node[idx1] == "a"
+    # Node should exist in the underlying networkx graph
+    assert idx1 == "a"
+    assert "a" in graph.graph
 
 
 def test_graph_multiple_nodes():

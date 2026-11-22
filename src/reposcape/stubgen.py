@@ -49,7 +49,7 @@ def generate_stub_from_source(
     Returns:
         The generated stub content as a string
     """
-    mypy, ASTStubGenerator = _get_mypy_imports()
+    mypy, stub_generator_cls = _get_mypy_imports()
 
     options = mypy.options.Options()
     options.python_version = (3, 13)
@@ -70,7 +70,7 @@ def generate_stub_from_source(
         msg = "Syntax errors in source:\n" + "\n".join(error_messages)
         raise SyntaxError(msg)
 
-    gen = ASTStubGenerator(
+    gen = stub_generator_cls(
         _all_=None,
         include_private=include_private,
         analyzed=False,
@@ -228,13 +228,11 @@ def generate_stubs_analyzed(
         )
 
         mypy_opts = mypy_options(options)
-        py_modules, pyc_modules, c_modules = collect_build_targets(options, mypy_opts)
+        py_modules, pyc_modules, _c_modules = collect_build_targets(options, mypy_opts)
 
         generate_asts_for_modules(py_modules, options.parse_only, mypy_opts, options.verbose)
 
         results: dict[str, str] = {}
-        all_module_names = sorted(m.module for m in py_modules + pyc_modules + c_modules)
-
         for mod in py_modules + pyc_modules:
             if mod.ast is None:
                 continue

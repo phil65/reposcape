@@ -9,7 +9,6 @@
 [![Implementation](https://img.shields.io/pypi/implementation/reposcape.svg)](https://pypi.org/project/reposcape/)
 [![Releases](https://img.shields.io/github/downloads/phil65/reposcape/total.svg)](https://github.com/phil65/reposcape/releases)
 [![Github Contributors](https://img.shields.io/github/contributors/phil65/reposcape)](https://github.com/phil65/reposcape/graphs/contributors)
-[![Github Discussions](https://img.shields.io/github/discussions/phil65/reposcape)](https://github.com/phil65/reposcape/discussions)
 [![Github Forks](https://img.shields.io/github/forks/phil65/reposcape)](https://github.com/phil65/reposcape/forks)
 [![Github Issues](https://img.shields.io/github/issues/phil65/reposcape)](https://github.com/phil65/reposcape/issues)
 [![Github Issues](https://img.shields.io/github/issues-pr/phil65/reposcape)](https://github.com/phil65/reposcape/pulls)
@@ -49,14 +48,12 @@ mapper = RepoMapper()
 overview = mapper.create_overview(
     repo_path="path/to/repo",
     detail=DetailLevel.SIGNATURES,
-    token_limit=2000  # Optional token limit for output
+    token_limit=2000,  # Optional token limit for output
 )
 
 # Generate focused view of specific files
 focused = mapper.create_focused_view(
-    files=["main.py", "utils.py"],
-    repo_path="path/to/repo",
-    detail=DetailLevel.DOCSTRINGS
+    files=["main.py", "utils.py"], repo_path="path/to/repo", detail=DetailLevel.DOCSTRINGS
 )
 ```
 
@@ -102,10 +99,10 @@ Control how much information is included in the output:
 
 ```python
 class DetailLevel(Enum):
-    STRUCTURE   # Just names and hierarchy
+    STRUCTURE  # Just names and hierarchy
     SIGNATURES  # Include function/class signatures
     DOCSTRINGS  # Include signatures + docstrings
-    FULL_CODE   # Include complete implementations
+    FULL_CODE  # Include complete implementations
 ```
 
 ## Code Analysis
@@ -215,9 +212,7 @@ class CustomAnalyzer(CodeAnalyzer):
         return path.endswith(".custom")
 
     def analyze_file(
-        self,
-        path: str | PathLike[str] | upath.UPath,
-        content: str | None = None
+        self, path: str | PathLike[str] | upath.UPath, content: str | None = None
     ) -> list[CodeNode]: ...
 ```
 
@@ -233,7 +228,7 @@ focused_view = mapper.create_focused_view(
     files=["src/core.py", "src/utils.py"],
     repo_path=".",
     detail=DetailLevel.DOCSTRINGS,
-    exclude_patterns=["**/test_*.py", "**/__pycache__/*"]
+    exclude_patterns=["**/test_*.py", "**/__pycache__/*"],
 )
 ```
 
@@ -243,11 +238,7 @@ Control output size for large repositories:
 
 ```python
 # Limit output to approximately 2000 tokens
-overview = mapper.create_overview(
-    repo_path=".",
-    token_limit=2000,
-    detail=DetailLevel.SIGNATURES
-)
+overview = mapper.create_overview(repo_path=".", token_limit=2000, detail=DetailLevel.SIGNATURES)
 ```
 
 ## Models

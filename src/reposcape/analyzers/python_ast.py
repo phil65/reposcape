@@ -88,7 +88,7 @@ class SymbolCollector(ast.NodeVisitor):
                 self._add_references_from_expr(arg.annotation)
 
         # Create function node
-        is_method = isinstance(node.parent, ast.ClassDef)  # type: ignore[attr-defined]
+        is_method = isinstance(node.parent, ast.ClassDef)  # ty: ignore[missing-attribute]
         func_node = CodeNode(
             name=node.name,
             node_type=NodeType.METHOD if is_method else NodeType.FUNCTION,
@@ -119,7 +119,7 @@ class SymbolCollector(ast.NodeVisitor):
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> Any:
         """Process async function definitions."""
-        is_method = isinstance(node.parent, ast.ClassDef)  # type: ignore[attr-defined]
+        is_method = isinstance(node.parent, ast.ClassDef)  # ty: ignore[missing-attribute]
 
         # Create function node
         func_node = CodeNode(
@@ -297,7 +297,7 @@ class PythonAstAnalyzer(CodeAnalyzer):
         # Add parent links to AST nodes
         for parent in ast.walk(tree):
             for child in ast.iter_child_nodes(parent):
-                child.parent = parent  # type: ignore[attr-defined]
+                child.parent = parent  # ty: ignore[missing-attribute]
 
         # Collect symbols
         collector = SymbolCollector(
@@ -340,7 +340,7 @@ class PythonAstAnalyzer(CodeAnalyzer):
         # Add parent links
         for parent in ast.walk(tree):
             for child in ast.iter_child_nodes(parent):
-                child.parent = parent  # type: ignore[attr-defined]
+                child.parent = parent  # ty: ignore[missing-attribute]
 
         # Collect symbols
         collector = SymbolCollector(

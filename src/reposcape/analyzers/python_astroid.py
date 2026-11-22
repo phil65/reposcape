@@ -56,10 +56,7 @@ class SymbolCollector:
         for child in node.get_children():
             self.visit(child)
 
-        class_node = CodeNode(**{
-            **dataclasses.asdict(class_node),
-            "children": self.symbols,
-        })
+        class_node = dataclasses.replace(class_node, children=self.symbols)
 
         self.symbols = old_symbols
         self.symbols[node.name] = class_node
